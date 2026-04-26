@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=68.0", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mediakit"
+version = "0.1.0"
+description = "Composable CLI toolkit for consuming media — scrape articles, transcribe videos, summarize anything"
+requires-python = ">=3.10"
+license = "MIT"
+readme = "README.md"
+
+dependencies = [
+    "typer[all]>=0.9.0",
+    "tomli>=2.0.0; python_version < '3.11'",
+    "playwright>=1.40.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=4.9.0",
+    "readability-lxml>=0.8.1",
+    "markdownify>=0.11.0",
+    "youtube-transcript-api>=0.6.0",
+    "yt-dlp>=2024.1.0",
+    "feedparser>=6.0.0",
+    "ollama>=0.1.0",
+    "httpx>=0.24.0",
+]
+
+[project.optional-dependencies]
+audio = [
+    "openai-whisper>=20231117",
+    "torch>=2.0.0",
+    "ffmpeg-python>=0.2.0",
+]
+bot = [
+    "python-telegram-bot>=20.0",
+]
+claude = [
+    "anthropic>=0.25.0",
+]
+openai = [
+    "openai>=1.0.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.1.0",
+]
+all = [
+    "mediakit[audio,bot,claude,openai]",
+]
+
+[project.scripts]
+crawl = "mediakit.cli.crawl:app"
+scrape = "mediakit.cli.scrape:app"
+transcribe = "mediakit.cli.transcribe:app"
+summarize = "mediakit.cli.summarize:app"
+archive = "mediakit.cli.archive:app"
+content = "mediakit.cli.content:app"
+mediakit = "mediakit.cli.init:app"
+content-bot = "mediakit.cli.bot:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (>5s)",
+    "network: marks tests requiring network access",
+    "audio: marks tests requiring Whisper/audio deps",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100

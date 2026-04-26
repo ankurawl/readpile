@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Test Podcast</title>
+    <link>https://podcast.example.com</link>
+    <description>A test podcast feed for unit testing</description>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 25 Apr 2026 00:00:00 GMT</lastBuildDate>
+    <itunes:author>Test Author</itunes:author>
+
+    <item>
+      <title>Episode 3: The Latest</title>
+      <link>https://podcast.example.com/episodes/3</link>
+      <description>The third and latest episode of the test podcast.</description>
+      <pubDate>Thu, 25 Apr 2026 00:00:00 GMT</pubDate>
+      <guid>https://podcast.example.com/episodes/3</guid>
+      <enclosure url="https://cdn.example.com/episodes/ep3.mp3" length="15000000" type="audio/mpeg"/>
+      <itunes:duration>00:30:00</itunes:duration>
+    </item>
+
+    <item>
+      <title>Episode 2: The Middle</title>
+      <link>https://podcast.example.com/episodes/2</link>
+      <description>The second episode of the test podcast.</description>
+      <pubDate>Mon, 20 Apr 2026 00:00:00 GMT</pubDate>
+      <guid>https://podcast.example.com/episodes/2</guid>
+      <enclosure url="https://cdn.example.com/episodes/ep2.mp3" length="12000000" type="audio/mpeg"/>
+      <itunes:duration>00:25:00</itunes:duration>
+    </item>
+
+    <item>
+      <title>Episode 1: The Beginning</title>
+      <link>https://podcast.example.com/episodes/1</link>
+      <description>The first episode of the test podcast.</description>
+      <pubDate>Wed, 15 Apr 2026 00:00:00 GMT</pubDate>
+      <guid>https://podcast.example.com/episodes/1</guid>
+      <enclosure url="https://cdn.example.com/episodes/ep1.mp3" length="10000000" type="audio/mpeg"/>
+      <itunes:duration>00:20:00</itunes:duration>
+    </item>
+  </channel>
+</rss>

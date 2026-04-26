@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Test Blog</title>
+  <link href="https://blog.example.com" rel="alternate"/>
+  <link href="https://blog.example.com/feed.xml" rel="self"/>
+  <id>https://blog.example.com/</id>
+  <updated>2026-04-25T00:00:00Z</updated>
+  <author>
+    <name>Test Author</name>
+  </author>
+
+  <entry>
+    <title>Second Blog Post</title>
+    <link href="https://blog.example.com/posts/second-post" rel="alternate"/>
+    <id>https://blog.example.com/posts/second-post</id>
+    <published>2026-04-25T00:00:00Z</published>
+    <updated>2026-04-25T00:00:00Z</updated>
+    <summary>This is the second blog post for testing Atom feed parsing.</summary>
+    <content type="html">&lt;p&gt;Full content of the second blog post.&lt;/p&gt;</content>
+  </entry>
+
+  <entry>
+    <title>First Blog Post</title>
+    <link href="https://blog.example.com/posts/first-post" rel="alternate"/>
+    <id>https://blog.example.com/posts/first-post</id>
+    <published>2026-04-20T00:00:00Z</published>
+    <updated>2026-04-20T00:00:00Z</updated>
+    <summary>This is the first blog post for testing Atom feed parsing.</summary>
+    <content type="html">&lt;p&gt;Full content of the first blog post.&lt;/p&gt;</content>
+  </entry>
+</feed>

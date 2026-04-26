@@ -1,0 +1,36 @@
+[general]
+output_dir = "~/custom-output"
+date_format = "YYYY-MM-DD"
+filename_max_length = 100
+
+[summarize]
+provider = "claude"
+default_length = "long"
+
+[summarize.ollama]
+model = "llama3.2"
+host = "http://localhost:11434"
+
+[summarize.claude]
+model = "claude-sonnet-4-20250514"
+
+[summarize.openai]
+model = "gpt-4o"
+
+[transcribe]
+engine = "whisper"
+whisper_model = "large"
+diarize = true
+
+[scrape]
+headless = false
+respect_robots = true
+rate_limit = 2.0
+
+[crawl]
+max_depth = 5
+max_pages = 50
+
+[bot]
+whitelist_file = "~/.mediakit/whitelist.json"
+preferences_file = "~/.mediakit/preferences.json"
