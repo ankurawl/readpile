@@ -11,19 +11,16 @@ from mediakit.core.detector import detect_url_type, URLType
 from mediakit.transcribers.youtube import (
     transcribe_youtube,
     get_youtube_metadata,
-    get_youtube_transcript,
     VideoNotFoundError,
     TranscriptNotAvailableError,
 )
-from mediakit.scrapers.article import scrape_article
+from mediakit.scrapers import scrape_url
 from mediakit.transcribers.audio import transcribe_from_url
-from mediakit.summarizer.engine import summarize
-from mediakit.summarizer.providers import get_provider, LLMConnectionError
 from mediakit.bot.whitelist import is_whitelisted, add_to_whitelist, remove_from_whitelist, load_whitelist
 from mediakit.bot.preferences import get_preferences, set_preference, add_to_history, get_history
 from mediakit.bot.telegram_formatter import (
-    format_summary_message,
-    create_summary_document,
+    format_content_message,
+    create_content_document,
     format_error_message,
     format_processing_status,
 )
@@ -42,13 +39,13 @@ def _get_config(context: ContextTypes.DEFAULT_TYPE) -> dict:
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "Welcome to MediaKit Bot!\n\n"
-        "Send me any URL and I'll summarize it for you.\n"
+        "Send me any URL and I'll extract its content for you.\n"
         "Supported: YouTube, blogs, articles, podcasts, audio/video.\n\n"
         "Commands:\n"
         "/help - List available commands\n"
         "/whoami - Show your chat ID\n"
         "/set_language <code> - Set transcript language\n"
-        "/set_style <brief|detailed> - Set summary style\n"
+        "/set_style <brief|detailed> - Set content style\n"
         "/history - Show recently processed items"
     )
 
@@ -60,13 +57,13 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/help - This help message\n"
         "/whoami - Show your chat ID\n"
         "/set_language <code> - Set transcript language (e.g., en, es, hi)\n"
-        "/set_style <brief|detailed> - Set summary style\n"
+        "/set_style <brief|detailed> - Set content style\n"
         "/history - Show recently processed items\n\n"
         "Admin commands:\n"
         "/admin_add <chat_id> - Add user to whitelist\n"
         "/admin_remove <chat_id> - Remove user from whitelist\n"
         "/admin_list - Show whitelisted users\n\n"
-        "Or just send any URL to get a summary!"
+        "Or just send any URL to extract its content!"
     )
 
 
@@ -210,52 +207,40 @@ async def admin_list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text(f"Whitelisted chat IDs:\n{ids}")
 
 
-async def _handle_youtube(url: str, language: str, config: dict) -> tuple[str, str, dict]:
-    """Process a YouTube URL. Returns (summary, transcript, metadata_dict)."""
-    metadata = get_youtube_metadata(url)
-    transcript = get_youtube_transcript(metadata["video_id"], language)
-    provider = get_provider(config)
-    summary = summarize(transcript, provider, metadata=metadata)
-    return summary, transcript, metadata
-
-
-async def _handle_article(url: str, config: dict) -> tuple[str, str, dict]:
-    """Process a blog/article URL via Playwright. Returns (summary, text, metadata_dict)."""
-    from playwright.async_api import async_playwright
-
-    async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=True)
-        page = await browser.new_page()
-        try:
-            await page.goto(url, wait_until="domcontentloaded")
-            html = await page.content()
-        finally:
-            await browser.close()
-
-    content_item = scrape_article(url, html)
-    provider = get_provider(config)
-    summary = summarize(content_item.text, provider, metadata={"title": content_item.title})
+async def _handle_youtube(url: str, language: str) -> tuple[str, dict]:
+    """Process a YouTube URL. Returns (content, metadata_dict)."""
+    item = transcribe_youtube(url, language)
     metadata = {
-        "title": content_item.title,
-        "channel": content_item.author or "",
+        "title": item.title,
+        "channel": item.channel or "",
+        "duration": item.duration or "",
+        "url": url,
+    }
+    return item.text, metadata
+
+
+async def _handle_article(url: str) -> tuple[str, dict]:
+    """Process a blog/article URL. Returns (content, metadata_dict)."""
+    item = await scrape_url(url)
+    metadata = {
+        "title": item.title,
+        "channel": item.author or "",
         "duration": "",
         "url": url,
     }
-    return summary, content_item.text, metadata
+    return item.text, metadata
 
 
-async def _handle_audio_video(url: str, config: dict) -> tuple[str, str, dict]:
-    """Process an audio/video URL. Returns (summary, transcript, metadata_dict)."""
-    content_item = transcribe_from_url(url)
-    provider = get_provider(config)
-    summary = summarize(content_item.text, provider, metadata={"title": content_item.title})
+async def _handle_audio_video(url: str) -> tuple[str, dict]:
+    """Process an audio/video URL. Returns (content, metadata_dict)."""
+    item = transcribe_from_url(url)
     metadata = {
-        "title": content_item.title,
-        "channel": content_item.channel or "",
-        "duration": content_item.duration or "",
+        "title": item.title,
+        "channel": item.channel or "",
+        "duration": item.duration or "",
         "url": url,
     }
-    return summary, content_item.text, metadata
+    return item.text, metadata
 
 
 async def url_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -287,27 +272,26 @@ async def url_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         if url_type == URLType.youtube:
             await status_msg.edit_text(format_processing_status("metadata"))
-            summary, transcript, metadata = await _handle_youtube(url, language, config)
+            content, metadata = await _handle_youtube(url, language)
 
         elif url_type == URLType.blog:
             await status_msg.edit_text(format_processing_status("scraping"))
-            summary, transcript, metadata = await _handle_article(url, config)
+            content, metadata = await _handle_article(url)
 
         elif url_type in (URLType.audio_file, URLType.video):
             await status_msg.edit_text(format_processing_status("downloading"))
-            summary, transcript, metadata = await _handle_audio_video(url, config)
+            content, metadata = await _handle_audio_video(url)
 
         else:
-            # Default fallback: treat as article/blog
             await status_msg.edit_text(format_processing_status("scraping"))
-            summary, transcript, metadata = await _handle_article(url, config)
+            content, metadata = await _handle_article(url)
 
         await status_msg.edit_text(format_processing_status("formatting"))
 
-        msg_text = format_summary_message(metadata, summary, style)
+        msg_text = format_content_message(metadata, content, style)
         await status_msg.edit_text(msg_text, parse_mode="HTML")
 
-        doc_bytes, doc_filename = create_summary_document(metadata, summary, transcript)
+        doc_bytes, doc_filename = create_content_document(metadata, content)
         await update.message.reply_document(
             document=io.BytesIO(doc_bytes),
             filename=doc_filename,
@@ -322,8 +306,6 @@ async def url_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     except VideoNotFoundError as e:
         await status_msg.edit_text(format_error_message(str(e)), parse_mode="HTML")
     except TranscriptNotAvailableError as e:
-        await status_msg.edit_text(format_error_message(str(e)), parse_mode="HTML")
-    except LLMConnectionError as e:
         await status_msg.edit_text(format_error_message(str(e)), parse_mode="HTML")
     except Exception as e:
         logger.exception("Error processing URL")

@@ -1,7 +1,6 @@
 # mediakit
 
-> Composable CLI toolkit for consuming media faster --
-> scrape articles, transcribe videos, summarize anything.
+**Convert any media into readable text — in seconds.** Scrape articles, transcribe YouTube videos, crawl entire blogs, and archive everything as Markdown. Use it from the command line, or let your LLM call it directly via MCP.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)]()
@@ -9,64 +8,49 @@
 
 ---
 
-## Quick Start
+## What is mediakit?
 
-```bash
-pip install mediakit
+mediakit turns web content into clean, structured text you can actually work with. Point it at a URL — a blog post, a YouTube video, a podcast RSS feed, a documentation site — and it gives you back Markdown with metadata, ready to read, search, summarize, or feed into any workflow.
 
-# Summarize a YouTube video
-transcribe https://youtube.com/watch?v=dQw4w9WgXcQ | summarize --length small
+**The problem it solves:** You want to consume a 45-minute conference talk, catch up on 20 blog posts from last week, or archive an entire documentation site before it goes offline. Doing this manually means clicking through pages, copying text, waiting for videos, and losing formatting. mediakit automates all of that — the browser rendering, the transcript extraction, the feed parsing, the file organization — so you get straight to the content.
 
-# Scrape and summarize a blog post
-scrape https://example.com/blog/post | summarize --length medium
+### What you can do with it
 
-# One command does it all -- auto-detect, summarize, archive
-content https://youtube.com/watch?v=dQw4w9WgXcQ
+- **Catch up fast** — Pull the last 10 posts from a blog, 5 episodes from a podcast feed, or a full YouTube playlist. Pipe them into your LLM and ask for a single consolidated briefing.
+- **Build a personal knowledge base** — Archive articles, transcripts, and documentation as searchable Markdown files. Everything gets clean filenames, dates, and metadata automatically.
+- **Give your LLM eyes and ears** — Connect mediakit as an MCP server and your AI assistant can read any webpage, watch any YouTube video, or crawl any site on demand.
+- **Create custom digests** — Combine content from multiple sources (RSS feeds + blog crawls + video transcripts) into a single stream, then process it however you want — summarize, translate, extract action items, generate study notes.
+- **Research at scale** — Crawl an entire documentation site or blog archive, extract every page, and have it all in one local directory as Markdown files you can grep, analyze, or feed to an LLM.
 
-# Batch download an entire blog
-crawl https://example.com/blog | scrape --batch | archive --dir ./blogs/
-```
+### What it can extract
 
----
+| Source | What you get |
+|--------|-------------|
+| **Blog posts & articles** | Clean Markdown with title, author, date, tags — extracted from the rendered page |
+| **YouTube videos** | Full transcript with timestamps, via YouTube's caption API (instant, free) |
+| **Audio & video files** | Whisper-powered transcription with optional speaker diarization |
+| **RSS/Atom feeds** | All entry URLs, ready to pipe into scrape or transcribe |
+| **Documentation sites** | Recursive crawl that discovers every page under a URL prefix |
+| **Any webpage** | Headless Chromium rendering + intelligent content extraction |
 
-## What It Does
-
-mediakit gives you seven composable CLI commands ("bricks") that snap
-together via Unix pipes. Each brick does one thing well; combine them
-to build any media consumption workflow.
-
-```
-                         +----------------+
-              +--------->|   summarize    |--------> stdout / file
-              |          +----------------+
-              |
-+-------+   +----------+                    +----------+
-| crawl |-->|  scrape   |------------------->| archive  |
-+-------+   +----------+                    +----------+
-              |                                  ^
-              |          +----------------+      |
-              +--------->|  transcribe    |------+
-                         +----------------+
-
-              +----------+
-              | content  |  (auto-detect + orchestrate all of the above)
-              +----------+
-
-              +----------+
-              | mediakit |  init / config management
-              +----------+
-
-              +--------------+
-              | content-bot  |  Telegram bot interface
-              +--------------+
-```
-
-**Data flow:** Every brick reads and writes `ContentItem` objects --
-a Markdown document with YAML front matter carrying metadata (title,
-date, author, source URL, content type, word count). Pipe one brick
-into another and they just work.
+### How it fits together
 
 ```
+                          ┌─────────┐
+                     ┌───→│ scrape  │───→ article text
+                     │    └─────────┘
+  ┌───────┐    ┌─────┴──┐ ┌───────────┐
+  │ crawl │───→│  URLs  │→│transcribe │───→ transcript
+  └───────┘    └─────┬──┘ └───────────┘
+                     │    ┌─────────┐        ┌─────────┐
+                     └───→│ content │───────→│ archive │───→ Markdown files
+                          └─────────┘        └─────────┘
+                          (auto-detect)
+```
+
+Tools output **ContentItems** — Markdown documents with YAML front matter — that pipe cleanly between commands, work with any Markdown viewer, and are easy for LLMs to parse:
+
+```markdown
 ---
 title: "How to Build CLI Tools"
 source_url: https://example.com/post
@@ -76,383 +60,278 @@ author: "Jane Doe"
 word_count: 2400
 ---
 
-Article body text here...
+The full article text in clean Markdown...
 ```
 
 ---
 
-## The Bricks
+## Quick Start
 
-### `crawl` -- Discover content URLs
-
-Finds URLs from blogs, RSS/Atom feeds, or entire websites. Outputs
-one URL per line, ready to pipe into `scrape` or `transcribe`.
+### Install
 
 ```bash
-# Auto-detect mode (RSS, blog, or site)
-crawl https://example.com/blog
-
-# Force RSS mode, last 5 entries
-crawl https://example.com/feed.xml --recent 5
-
-# Full site crawl with depth limit
-crawl https://docs.example.com --mode site --depth 3 --max-pages 50
-
-# Blog crawl with auth (opens visible browser for login)
-crawl https://members-only.com/blog --mode blog --login
+pip install mediakit
+playwright install chromium    # needed for web scraping
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--mode` | `auto` | `auto`, `blog`, `site`, `rss` |
-| `--depth` | `10` | Max crawl depth |
-| `--max-pages` | `100` | Max pages to discover |
-| `--recent N` | all | Only return N most recent (RSS) |
-| `--scope` | `prefix` | `prefix` or `domain` (site mode) |
-| `--login` | off | Persistent browser profile for auth |
-
----
-
-### `scrape` -- Extract articles from web pages
-
-Launches a headless Chromium browser via Playwright, extracts article
-content with readability heuristics, and converts to clean Markdown.
-Falls back to a generic webpage scraper for non-article pages.
+### Use from the command line
 
 ```bash
-# Single URL
+# Extract content from any URL (auto-detects type)
+content https://youtube.com/watch?v=dQw4w9WgXcQ
+content https://example.com/blog/post
+
+# Scrape a single article
 scrape https://example.com/blog/great-post
 
-# Batch mode -- pipe from crawl
-crawl https://example.com/blog | scrape --batch
+# Transcribe a YouTube video
+transcribe https://youtube.com/watch?v=dQw4w9WgXcQ
 
-# Visible browser, skip robots.txt
-scrape https://example.com/post --no-headless --no-robots
+# Crawl a blog and archive every post
+crawl https://example.com/blog | scrape --batch | archive --dir ./blog-archive/
+
+# Extract and save to disk
+content https://example.com/post --archive
+```
+
+### Use from an LLM (via MCP)
+
+mediakit ships as an [MCP server](https://modelcontextprotocol.io/) that any compatible LLM client can discover and use. Once connected, your LLM can scrape pages, transcribe videos, crawl sites, and archive content — then use its own intelligence to summarize, compare, translate, or do whatever you ask.
+
+**Claude Code** — auto-configured via `.mcp.json` at the repo root:
+
+```bash
+pip install mediakit[mcp]
+# Claude Code discovers the server automatically
+```
+
+**Other MCP clients** — add to your client's MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "mediakit": {
+      "command": "mediakit-mcp",
+      "args": [],
+      "type": "stdio"
+    }
+  }
+}
+```
+
+Available MCP tools:
+
+| MCP Tool | What it does |
+|----------|-------------|
+| `scrape(url)` | Extract article/webpage content as Markdown |
+| `transcribe(source, language)` | Transcribe YouTube or audio/video URLs |
+| `crawl(url, mode, recent, limit)` | Discover content URLs from feeds, blogs, or sites |
+| `archive(content, title, source_url)` | Save content to disk as a Markdown file |
+| `detect_type(url)` | Identify URL type (youtube, rss, blog, audio, etc.) |
+
+---
+
+## Example Workflows
+
+### Morning briefing from multiple sources
+
+```bash
+# Pull recent posts from 3 blogs + a podcast, combine into one stream
+{
+  crawl https://blog-a.com/feed.xml --recent 3 | scrape --batch
+  crawl https://blog-b.com/blog | scrape --batch
+  transcribe https://youtube.com/watch?v=latest-talk
+} | archive --batch --dir ./daily-briefing/
+# Then ask your LLM: "Summarize today's briefing into 5 bullet points"
+```
+
+### Archive a blog before it disappears
+
+```bash
+crawl https://closing-soon.com/blog | scrape --batch | archive --dir ./saved-blog/
+# Every post saved as YYYY-MM-DD_title-slug.md with full metadata
+```
+
+### Research a topic across sources
+
+```bash
+# Crawl docs, grab relevant videos, pull it all into one folder
+crawl https://docs.example.com --mode site --depth 3 | scrape --batch | archive --dir ./research/
+transcribe https://youtube.com/watch?v=related-talk | archive --dir ./research/
+# Now you have a complete research folder to analyze
+```
+
+### Catch up on a podcast
+
+```bash
+crawl https://podcast.com/feed.xml --recent 5
+# Returns 5 episode URLs — pipe to transcribe, then ask your LLM for highlights
+```
+
+### Download behind a login wall
+
+```bash
+crawl https://members.example.com/blog --login | scrape --batch | archive --dir ./members/
+# Opens a real browser for you to log in, then crawls with your session
+```
+
+---
+
+## CLI Reference
+
+### `content` — Auto-detect and extract (the all-in-one command)
+
+```bash
+content URL                          # extract to stdout
+content URL --archive                # extract + save to disk
+content URL --no-archive             # force stdout-only
+content --batch < urls.txt           # process multiple URLs
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--batch` | off | Read URLs from stdin, one per line |
-| `--headless / --no-headless` | headless | Browser visibility |
-| `--respect-robots / --no-robots` | respect | Check robots.txt |
-| `--rate-limit` | `1.0` | Seconds between requests |
+| `--archive / --no-archive` | from config | Force archiving on or off |
+| `--dir` | `~/mediakit-output` | Output directory when archiving |
+| `--batch` | off | Read URLs from stdin (one per line) |
 
----
+### `scrape` — Extract articles from web pages
 
-### `transcribe` -- Transcribe audio and video
-
-Transcribes YouTube videos (via captions API), local audio/video files,
-and remote media URLs. Uses YouTube captions when available; falls back
-to OpenAI Whisper for everything else.
+Uses a headless Chromium browser. Tries structured article extraction first (readability heuristics), falls back to generic webpage scraping.
 
 ```bash
-# YouTube -- uses captions API (fast, free)
+scrape https://example.com/post
+crawl https://example.com/blog | scrape --batch
+scrape URL --no-headless --no-robots     # visible browser, skip robots.txt
+```
+
+### `transcribe` — Transcribe audio and video
+
+YouTube videos use the captions API (instant). Local and remote audio/video files use OpenAI Whisper.
+
+```bash
 transcribe https://youtube.com/watch?v=dQw4w9WgXcQ
-
-# Local audio file -- uses Whisper
 transcribe recording.mp3 --model small
-
-# Batch transcribe from a list
-crawl https://podcast.com/feed.xml | transcribe --batch
-
-# Spanish transcript with speaker diarization
 transcribe interview.wav --language es --diarize
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--batch` | off | Read sources from stdin |
-| `--language` | `en` | Transcript language code |
-| `--engine` | `auto` | `auto`, `whisper`, `whisperx` |
-| `--model` | `base` | Whisper model: `tiny`, `base`, `small`, `medium`, `large` |
-| `--diarize / --no-diarize` | off | Speaker diarization (needs `HF_TOKEN`) |
+### `crawl` — Discover content URLs
 
----
-
-### `summarize` -- AI-powered summaries
-
-Sends content through an LLM to produce structured summaries with
-key takeaways and learnings. Supports Ollama (local, free), Claude,
-OpenAI, or any OpenAI-compatible endpoint.
+Finds URLs from RSS/Atom feeds, blogs (via Playwright), or full site crawls. Outputs one URL per line.
 
 ```bash
-# Pipe from any brick
-transcribe https://youtube.com/watch?v=xxx | summarize --length small
-
-# Summarize a file
-summarize notes.md --length long
-
-# Use Claude instead of Ollama
-summarize notes.md --provider claude --model claude-sonnet-4-20250514
-
-# Batch summarize with cost confirmation
-scrape --batch < urls.txt | summarize --batch --provider openai --confirm
+crawl https://example.com/blog                       # auto-detect mode
+crawl https://example.com/feed.xml --recent 5        # RSS, 5 most recent
+crawl https://docs.example.com --mode site --depth 3 # recursive site crawl
+crawl https://members.example.com --mode blog --login # auth via persistent browser
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--length` | `medium` | `small` (~10%), `medium` (~20%), `long` (~40%) |
-| `--provider` | `ollama` | `ollama`, `claude`, `openai`, `custom` |
-| `--model` | per-provider | Model name override |
-| `--batch` | off | Process batch items from stdin |
-| `--confirm` | off | Confirm before paid API calls |
+### `archive` — Save to disk
 
-**Summary output structure:**
-
-```markdown
-## Summary
-3-5 paragraph overview of the content.
-
-## Key Takeaways
-- Standalone, actionable bullet points.
-
-## Learnings
-- Specific facts, frameworks, and mental models.
-```
-
----
-
-### `archive` -- Save with standardized naming
-
-Writes ContentItem(s) to disk as Markdown files with YAML front matter.
-Filenames follow the pattern `YYYY-MM-DD_title-slug.md` with automatic
-deduplication.
+Reads ContentItems from stdin and writes Markdown files with standardized naming (`YYYY-MM-DD_title-slug.md`).
 
 ```bash
-# Archive a single item
 scrape https://example.com/post | archive --dir ./saved/
-
-# Batch archive
-crawl https://example.com/blog | scrape --batch | archive --batch --dir ./blog/
+crawl URL | scrape --batch | archive --batch --dir ./blog/
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--dir` | `~/mediakit-output` | Output directory |
-| `--batch` | off | Process batch items from stdin |
+### `mediakit init` — Set up configuration
+
+```bash
+mediakit init
+# Prompts: archive by default? output directory?
+# Writes ~/.mediakit/config.toml
+```
+
+### `content-bot` — Telegram bot
+
+```bash
+content-bot start     # start the bot
+content-bot status    # check if configured
+```
 
 ---
 
-### `content` -- Auto-detect and process any URL
+## Archiving
 
-The convenience command. Detects the source type, runs the right
-extraction brick, summarizes, and archives -- all in one step.
+By default, content goes to stdout. Opt in to saving files with `--archive` or by setting `auto_archive = true` in config.
 
-```bash
-# YouTube video -- transcribe + summarize + archive
-content https://youtube.com/watch?v=dQw4w9WgXcQ
-
-# Blog post -- scrape + summarize + archive
-content https://example.com/blog/post
-
-# Local audio -- transcribe + summarize + archive
-content podcast.mp3
-
-# Skip summarization
-content https://example.com/post --no-summary
-
-# Skip archiving, just print to stdout
-content https://example.com/post --no-archive
-
-# Batch process
-content --batch < urls.txt --dir ./research/
-```
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--no-summary` | off | Skip summarization |
-| `--no-archive` | off | Skip archiving (stdout only) |
-| `--summary-length` | `medium` | `small`, `medium`, `long` |
-| `--provider` | from config | LLM provider override |
-| `--model` | from config | Model override |
-| `--dir` | `~/mediakit-output` | Archive directory |
-| `--batch` | off | Process URLs from stdin |
-
----
-
-## Composing Bricks
-
-### Morning podcast catchup
-
-```bash
-crawl https://podcast.com/feed.xml --recent 5 \
-  | transcribe --batch \
-  | summarize --batch --length small
-```
-
-### Research a topic across blogs
-
-```bash
-crawl https://example.com/blog \
-  | scrape --batch \
-  | summarize --batch \
-  | archive --dir ./research/
-```
-
-### Archive documentation
-
-```bash
-crawl https://docs.example.com --mode site --depth 3 \
-  | scrape --batch \
-  | archive --dir ./docs/
-```
-
-### Summarize a conference talk
-
-```bash
-transcribe https://youtube.com/watch?v=dQw4w9WgXcQ \
-  | summarize --length long --provider claude
-```
-
-### Download a members-only blog
-
-```bash
-crawl https://members.example.com/blog --login \
-  | scrape --batch \
-  | archive --dir ./members-blog/
-```
+| Command | `auto_archive = false` (default) | `auto_archive = true` |
+|---------|----------------------------------|----------------------|
+| `content URL` | stdout only | stdout + save to file |
+| `content URL --archive` | stdout + save | stdout + save |
+| `content URL --no-archive` | stdout only | stdout only |
+| MCP `archive()` | always saves (explicit call) | always saves |
 
 ---
 
 ## Telegram Bot
 
-mediakit includes an optional Telegram bot that lets you send URLs and
-receive summaries on your phone.
-
-### Setup
+An optional Telegram bot — send it any URL and get back extracted content as a formatted message plus a downloadable Markdown document.
 
 ```bash
 pip install mediakit[bot]
-
-# Set required env vars
 export TELEGRAM_BOT_TOKEN="your-bot-token"
 export ADMIN_CHAT_ID="your-telegram-chat-id"
-
-# Start the bot
 content-bot start
-
-# Check configuration
-content-bot status
 ```
 
-### Usage
-
-Send any URL to the bot and it will auto-detect the content type,
-extract the text, summarize it, and reply with:
-
-1. A formatted summary message
-2. A downloadable Markdown document with the full transcript/text
-
-### Bot commands
-
-| Command | Description |
-|---------|-------------|
-| `/start` | Welcome message |
-| `/help` | List available commands |
-| `/whoami` | Show your chat ID |
-| `/set_language <code>` | Set transcript language (e.g., `en`, `es`, `hi`) |
-| `/set_style <brief\|detailed>` | Set summary style |
-| `/history` | Show recently processed items |
-| `/admin_add <chat_id>` | Add user to whitelist (admin only) |
-| `/admin_remove <chat_id>` | Remove user from whitelist (admin only) |
-| `/admin_list` | Show whitelisted users (admin only) |
+Supports `/set_language`, `/set_style brief|detailed`, `/history`, and admin whitelist commands.
 
 ---
 
 ## Configuration
 
-### Initialize config
-
 ```bash
-mediakit init
-# Creates ~/.mediakit/config.toml with commented defaults
+mediakit init    # interactive setup, writes ~/.mediakit/config.toml
 ```
-
-### Config file reference
 
 ```toml
-# ~/.mediakit/config.toml
-
 [general]
-output_dir = "~/mediakit-output"       # default archive directory
-date_format = "YYYY-MM-DD"             # filename date format
-filename_max_length = 80               # max filename slug length
-
-[summarize]
-provider = "ollama"                    # "ollama" | "claude" | "openai" | "custom"
-default_length = "medium"              # "small" | "medium" | "long"
-
-[summarize.ollama]
-model = "llama3.2"                     # any Ollama model name
-host = "http://localhost:11434"        # Ollama server URL
-
-[summarize.claude]
-model = "claude-sonnet-4-20250514"     # Claude model ID
-
-[summarize.openai]
-model = "gpt-4o"                       # OpenAI model ID
-
-[summarize.custom]
-endpoint = ""                          # OpenAI-compatible endpoint URL
-model = ""                             # model name at that endpoint
+output_dir = "~/mediakit-output"      # where archived files go
+auto_archive = false                  # archive by default? (overridden by --archive/--no-archive)
+date_format = "YYYY-MM-DD"
+filename_max_length = 80
 
 [transcribe]
-engine = "auto"                        # "auto" | "whisper" | "whisperx"
-whisper_model = "base"                 # "tiny" | "base" | "small" | "medium" | "large"
-diarize = false                        # speaker diarization (requires HF_TOKEN)
+engine = "auto"                       # "auto" | "whisper" | "whisperx"
+whisper_model = "base"                # "tiny" | "base" | "small" | "medium" | "large"
+diarize = false                       # speaker diarization (requires HF_TOKEN)
 
 [scrape]
-headless = true                        # run browser in headless mode
-respect_robots = true                  # check robots.txt before scraping
-rate_limit = 1.0                       # seconds between requests
+headless = true
+respect_robots = true
+rate_limit = 1.0                      # seconds between requests
 
 [crawl]
-max_depth = 10                         # max crawl depth for site mode
-max_pages = 100                        # max pages to discover
-
-[bot]
-whitelist_file = "~/.mediakit/whitelist.json"
-preferences_file = "~/.mediakit/preferences.json"
+max_depth = 10
+max_pages = 100
 ```
 
-### Environment variables
-
-| Variable | Maps to | Description |
-|----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | `summarize.claude.api_key` | Anthropic API key |
-| `OPENAI_API_KEY` | `summarize.openai.api_key` | OpenAI API key |
-| `MEDIAKIT_LLM_API_KEY` | `summarize.custom.api_key` | Custom endpoint key |
-| `HF_TOKEN` | `transcribe.hf_token` | HuggingFace token (diarization) |
-| `TELEGRAM_BOT_TOKEN` | `bot.token` | Telegram bot token |
-| `OLLAMA_HOST` | `summarize.ollama.host` | Ollama server URL |
-| `MEDIAKIT_CONFIG` | -- | Override config file path |
-
-### Precedence (highest wins)
-
-1. CLI flags (`--provider claude`)
-2. Environment variables (`ANTHROPIC_API_KEY`)
-3. Config file (`~/.mediakit/config.toml`)
-4. Built-in defaults
+| Environment Variable | Description |
+|---------------------|-------------|
+| `HF_TOKEN` | HuggingFace token for speaker diarization |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token |
+| `MEDIAKIT_CONFIG` | Override config file path |
 
 ---
 
 ## Installation
 
-### pip (recommended)
-
 ```bash
-pip install mediakit              # base: scraping, crawling, YouTube transcription
-pip install mediakit[audio]       # + Whisper transcription (torch, ffmpeg-python)
-pip install mediakit[bot]         # + Telegram bot
-pip install mediakit[claude]      # + Anthropic Claude provider
-pip install mediakit[openai]      # + OpenAI provider
-pip install mediakit[all]         # everything
+pip install mediakit               # base: scraping, crawling, YouTube transcription
+pip install mediakit[audio]        # + Whisper transcription (torch, ffmpeg-python)
+pip install mediakit[bot]          # + Telegram bot
+pip install mediakit[mcp]          # + MCP server for LLM integration
+pip install mediakit[all]          # everything
+pip install mediakit[dev]          # + test/lint tools
+
+playwright install chromium        # required for web scraping
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/your-username/mediakit.git
+git clone https://github.com/anthropics/mediakit.git
 cd mediakit
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,all]"
@@ -461,128 +340,37 @@ playwright install chromium
 
 ### System dependencies
 
-| Dependency | What needs it | macOS | Ubuntu/Debian |
-|------------|--------------|-------|---------------|
-| ffmpeg | Audio transcription | `brew install ffmpeg` | `sudo apt install ffmpeg` |
-| Chromium | Scraping (auto-installed) | `playwright install chromium` | `playwright install chromium` |
-| Ollama | Local summarization | `brew install ollama` | [ollama.com/download](https://ollama.com/download) |
+| Dependency | Required for | Install |
+|------------|-------------|---------|
+| Chromium | Web scraping | `playwright install chromium` (auto-managed) |
+| ffmpeg | Audio transcription | `brew install ffmpeg` / `apt install ffmpeg` |
 
 ---
 
-## Architecture
+## Project Structure
 
 ```
 src/mediakit/
-|
-|-- core/                      # Shared infrastructure
-|   |-- models.py              # ContentItem dataclass + serialization
-|   |-- config.py              # TOML config loader with env overlay
-|   |-- detector.py            # URL type detection (YouTube, RSS, audio, etc.)
-|   |-- archiver.py            # Filename generation + file writing
-|   |-- cache.py               # Response caching
-|   +-- robots.py              # robots.txt checker
-|
-|-- crawlers/                  # URL discovery
-|   |-- rss.py                 # RSS/Atom feed parser
-|   |-- blog.py                # Playwright-based blog crawler
-|   +-- site.py                # Recursive site crawler
-|
-|-- scrapers/                  # Content extraction
-|   |-- article.py             # Readability-based article extractor
-|   +-- webpage.py             # Generic webpage scraper (fallback)
-|
-|-- transcribers/              # Audio/video transcription
-|   |-- youtube.py             # YouTube captions API
-|   +-- audio.py               # Whisper-based transcription
-|
-|-- summarizer/                # LLM summarization
-|   |-- engine.py              # Prompt building, chunking, synthesis
-|   +-- providers.py           # LLM adapters (Ollama, Claude, OpenAI, custom)
-|
-|-- bot/                       # Telegram bot
-|   |-- main.py                # Bot entry point + handler registration
-|   |-- handlers.py            # Command and message handlers
-|   |-- whitelist.py           # User access control
-|   |-- preferences.py         # Per-user settings (language, style)
-|   +-- telegram_formatter.py  # Message formatting
-|
-+-- cli/                       # CLI entry points (one per brick)
-    |-- crawl.py               # crawl command
-    |-- scrape.py              # scrape command
-    |-- transcribe.py          # transcribe command
-    |-- summarize.py           # summarize command
-    |-- archive.py             # archive command
-    |-- content.py             # content command (orchestrator)
-    |-- init.py                # mediakit init
-    +-- bot.py                 # content-bot command
+├── cli/             # CLI entry points (one per command)
+├── scrapers/        # Article + webpage content extraction
+├── transcribers/    # YouTube captions + Whisper audio transcription
+├── crawlers/        # RSS, blog, and site URL discovery
+├── core/            # Config, models, archiver, URL detector, robots.txt
+├── bot/             # Telegram bot
+└── mcp_server.py    # MCP server (FastMCP)
 ```
-
-### ContentItem data model
-
-The `ContentItem` dataclass is the universal data format. Every brick
-produces and/or consumes it. It serializes to YAML front matter +
-Markdown body, and deserializes from the same format via stdin.
-
-Batch operations use `---CONTENT_ITEM---` as a delimiter between
-items.
-
-### LLM provider pattern
-
-All LLM providers implement the `LLMProvider` abstract base class with
-a single `generate(prompt) -> str` method. Adding a new provider means:
-
-1. Subclass `LLMProvider` in `providers.py`
-2. Add the config section to `DEFAULTS` in `config.py`
-3. Add the dispatch case in `get_provider()`
 
 ---
 
-## Contributing
-
-### Adding a new scraper
-
-1. Create `src/mediakit/scrapers/your_scraper.py`
-2. Implement a function that takes a URL/HTML and returns a `ContentItem`
-3. Wire it into `cli/scrape.py` (detection + fallback logic)
-4. Add tests in `tests/test_your_scraper.py`
-
-### Adding a new transcriber
-
-1. Create `src/mediakit/transcribers/your_transcriber.py`
-2. Implement a function that returns a `ContentItem` with the transcript
-3. Add detection logic in `core/detector.py` if needed
-4. Wire it into `cli/transcribe.py`
-5. Add tests
-
-### Adding a new LLM provider
-
-1. Subclass `LLMProvider` in `summarizer/providers.py`
-2. Add config defaults in `core/config.py` under `DEFAULTS["summarize"]`
-3. Add env var mapping in `core/config.py` `ENV_MAP` if needed
-4. Add the dispatch case in `get_provider()`
-5. Add tests in `tests/test_providers.py`
-
-### Running tests
+## Running Tests
 
 ```bash
-# All tests (skip slow, network, and audio tests)
-pytest tests/ -v -m "not slow and not network and not audio"
-
-# Full suite
-pytest tests/ -v
-
-# With coverage
-pytest tests/ --cov=mediakit --cov-report=term-missing
-```
-
-### Linting
-
-```bash
-ruff check src/ tests/
+pytest tests/ -v                                           # full suite (157 tests)
+pytest tests/ -m "not slow and not network and not audio"  # fast tests only
 ```
 
 ---
 
 ## License
 
-MIT -- see [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE) for details.

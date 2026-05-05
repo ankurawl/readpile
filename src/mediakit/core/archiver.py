@@ -1,7 +1,6 @@
 """Archiver — filename generation, sanitization, and saving ContentItems to disk.
 
-Merges patterns from blog-scraper's PostWriter (underscore slugs, dedup)
-and yt-summarizer's formatter (hyphen slugs, date prefix).
+Merges patterns from blog-scraper's PostWriter (underscore slugs, dedup).
 """
 
 from __future__ import annotations

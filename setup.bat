@@ -16,7 +16,7 @@ REM ── Navigate to project root ──────────────�
 cd /d "%~dp0"
 
 REM ── 1. Check Python version ────────────────────────────────────────
-echo [1/10] Checking Python version...
+echo [1/8] Checking Python version...
 
 set "PYTHON="
 where python >nul 2>&1
@@ -53,7 +53,7 @@ echo [OK]   Python %PY_VERSION%
 
 REM ── 2. Create virtual environment ──────────────────────────────────
 echo.
-echo [2/10] Creating virtual environment...
+echo [2/8] Creating virtual environment...
 
 if exist ".venv\Scripts\python.exe" (
     echo [OK]   Reusing existing .venv\
@@ -80,7 +80,7 @@ echo [OK]   pip upgraded
 
 REM ── 3. Install Python dependencies ────────────────────────────────
 echo.
-echo [3/10] Installing Python dependencies...
+echo [3/8] Installing Python dependencies...
 
 echo [INFO] Installing mediakit with all extras...
 pip install -e ".[all,dev]" --quiet
@@ -93,7 +93,7 @@ if %ERRORLEVEL% equ 0 (
 
 REM ── 4. Install Playwright browser ─────────────────────────────────
 echo.
-echo [4/10] Installing Playwright Chromium browser...
+echo [4/8] Installing Playwright Chromium browser...
 
 where playwright >nul 2>&1
 if %ERRORLEVEL% equ 0 (
@@ -121,7 +121,7 @@ if %ERRORLEVEL% equ 0 (
 
 REM ── 5. Check ffmpeg ────────────────────────────────────────────────
 echo.
-echo [5/10] Checking ffmpeg...
+echo [5/8] Checking ffmpeg...
 
 where ffmpeg >nul 2>&1
 if %ERRORLEVEL% equ 0 (
@@ -133,40 +133,9 @@ if %ERRORLEVEL% equ 0 (
     set /a ERRORS+=1
 )
 
-REM ── 6. Check Ollama ───────────────────────────────────────────────
+REM ── 6. Detect GPU ─────────────────────────────────────────────────
 echo.
-echo [6/10] Checking Ollama...
-
-where ollama >nul 2>&1
-if %ERRORLEVEL% equ 0 (
-    echo [OK]   Ollama found
-) else (
-    echo [WARN] Ollama not found. Local LLM summarization will not work.
-    echo [WARN] Download from https://ollama.com/download
-    set /a ERRORS+=1
-)
-
-REM ── 7. Pull default Ollama model ──────────────────────────────────
-echo.
-echo [7/10] Pulling default Ollama model...
-
-where ollama >nul 2>&1
-if %ERRORLEVEL% equ 0 (
-    echo [INFO] Pulling llama3.2...
-    ollama pull llama3.2
-    if %ERRORLEVEL% equ 0 (
-        echo [OK]   llama3.2 model ready
-    ) else (
-        echo [WARN] Could not pull llama3.2. Is Ollama running?
-        set /a ERRORS+=1
-    )
-) else (
-    echo [INFO] Skipping model pull ^(Ollama not installed^)
-)
-
-REM ── 8. Detect GPU ─────────────────────────────────────────────────
-echo.
-echo [8/10] Detecting GPU...
+echo [6/8] Detecting GPU...
 
 where nvidia-smi >nul 2>&1
 if %ERRORLEVEL% equ 0 (
@@ -177,9 +146,9 @@ if %ERRORLEVEL% equ 0 (
     echo [INFO] No NVIDIA GPU detected. Whisper will run on CPU.
 )
 
-REM ── 9. Generate config file ───────────────────────────────────────
+REM ── 7. Generate config file ───────────────────────────────────────
 echo.
-echo [9/10] Generating config file...
+echo [7/8] Generating config file...
 
 set "CONFIG_FILE=%USERPROFILE%\.mediakit\config.toml"
 
@@ -196,9 +165,9 @@ if exist "%CONFIG_FILE%" (
     )
 )
 
-REM ── 10. Run quick tests ───────────────────────────────────────────
+REM ── 8. Run quick tests ───────────────────────────────────────────
 echo.
-echo [10/10] Running quick test suite...
+echo [8/8] Running quick test suite...
 
 if exist "tests" (
     echo [INFO] Running fast tests...
@@ -231,7 +200,7 @@ echo.
 echo   Quick start:
 echo     scrape https://example.com/blog-post
 echo     transcribe https://youtube.com/watch?v=...
-echo     summarize input.md
+echo     content https://example.com/article
 echo     crawl rss https://blog.example.com/feed
 echo.
 echo   Run tests:

@@ -4,7 +4,8 @@ import io
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import pytest_asyncio
+
+pytest.importorskip("telegram")
 
 from mediakit.bot.handlers import (
     admin_add_handler,
@@ -23,38 +24,25 @@ from mediakit.bot.whitelist import add_to_whitelist, is_whitelisted, load_whitel
 from mediakit.core.detector import URLType
 
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
 ADMIN_CHAT_ID = 12345
 USER_CHAT_ID = 67890
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture
 def data_dir(tmp_path):
-    """Provide a temporary data directory."""
     return str(tmp_path)
 
 
 @pytest.fixture
 def config(data_dir):
-    """Provide a basic config dict."""
     return {
         "admin_chat_id": ADMIN_CHAT_ID,
         "data_dir": data_dir,
-        "summarize": {"provider": "ollama"},
     }
 
 
 @pytest.fixture
 def mock_update():
-    """Create a mock Telegram Update object."""
     update = AsyncMock()
     update.effective_chat.id = ADMIN_CHAT_ID
     update.effective_user.username = "testuser"
@@ -66,16 +54,10 @@ def mock_update():
 
 @pytest.fixture
 def mock_context(config):
-    """Create a mock Telegram context with config in bot_data."""
     context = AsyncMock()
     context.bot_data = {"config": config}
     context.args = []
     return context
-
-
-# ---------------------------------------------------------------------------
-# /start, /help, /whoami
-# ---------------------------------------------------------------------------
 
 
 class TestStartHandler:
@@ -108,11 +90,6 @@ class TestWhoamiHandler:
         assert str(ADMIN_CHAT_ID) in msg
 
 
-# ---------------------------------------------------------------------------
-# /set_language, /set_style
-# ---------------------------------------------------------------------------
-
-
 class TestSetLanguageHandler:
     @pytest.mark.asyncio
     async def test_sets_language(self, mock_update, mock_context, data_dir):
@@ -131,7 +108,7 @@ class TestSetLanguageHandler:
 
     @pytest.mark.asyncio
     async def test_non_whitelisted_user_ignored(self, mock_update, mock_context):
-        mock_update.effective_chat.id = 99999  # not admin, not whitelisted
+        mock_update.effective_chat.id = 99999
         mock_context.args = ["fr"]
         await set_language_handler(mock_update, mock_context)
         mock_update.message.reply_text.assert_not_called()
@@ -160,11 +137,6 @@ class TestSetStyleHandler:
         assert "Usage" in msg
 
 
-# ---------------------------------------------------------------------------
-# /history
-# ---------------------------------------------------------------------------
-
-
 class TestHistoryHandler:
     @pytest.mark.asyncio
     async def test_empty_history(self, mock_update, mock_context):
@@ -185,11 +157,6 @@ class TestHistoryHandler:
         msg = mock_update.message.reply_text.call_args[0][0]
         assert "Test Video" in msg
         assert "Recent items" in msg
-
-
-# ---------------------------------------------------------------------------
-# /admin_add, /admin_remove, /admin_list
-# ---------------------------------------------------------------------------
 
 
 class TestAdminAddHandler:
@@ -279,11 +246,6 @@ class TestAdminListHandler:
         assert "not authorized" in msg
 
 
-# ---------------------------------------------------------------------------
-# URL message handler
-# ---------------------------------------------------------------------------
-
-
 class TestUrlMessageHandler:
     @pytest.mark.asyncio
     async def test_ignores_messages_without_urls(self, mock_update, mock_context):
@@ -296,75 +258,57 @@ class TestUrlMessageHandler:
         mock_update.effective_chat.id = 99999
         mock_update.message.text = "https://www.youtube.com/watch?v=abc123"
         await url_message_handler(mock_update, mock_context)
-        # Non-whitelisted users should not get a reply
         mock_update.message.reply_text.assert_not_called()
 
     @pytest.mark.asyncio
     @patch("mediakit.bot.handlers.add_to_history")
-    @patch("mediakit.bot.handlers.create_summary_document")
-    @patch("mediakit.bot.handlers.format_summary_message")
-    @patch("mediakit.bot.handlers.summarize")
-    @patch("mediakit.bot.handlers.get_provider")
-    @patch("mediakit.bot.handlers.get_youtube_transcript")
-    @patch("mediakit.bot.handlers.get_youtube_metadata")
+    @patch("mediakit.bot.handlers.create_content_document")
+    @patch("mediakit.bot.handlers.format_content_message")
+    @patch("mediakit.bot.handlers.transcribe_youtube")
     @patch("mediakit.bot.handlers.detect_url_type")
     async def test_youtube_url_happy_path(
         self,
         mock_detect,
-        mock_metadata,
-        mock_transcript,
-        mock_get_provider,
-        mock_summarize,
+        mock_transcribe,
         mock_format_msg,
         mock_create_doc,
         mock_add_history,
         mock_update,
         mock_context,
     ):
+        from mediakit.core.models import ContentItem, ContentType
+
         mock_update.message.text = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
-        # Set up the mock chain
         mock_detect.return_value = URLType.youtube
-        mock_metadata.return_value = {
-            "title": "Test Video",
-            "channel": "Test Channel",
-            "duration": "5:00",
-            "video_id": "dQw4w9WgXcQ",
-            "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-        }
-        mock_transcript.return_value = "This is the transcript text."
-        mock_provider = MagicMock()
-        mock_get_provider.return_value = mock_provider
-        mock_summarize.return_value = "## Summary\nTest summary content"
-        mock_format_msg.return_value = "<b>Test Video</b>\nSummary..."
+        mock_transcribe.return_value = ContentItem(
+            text="This is the transcript text.",
+            title="Test Video",
+            source_url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            content_type=ContentType.youtube,
+            channel="Test Channel",
+            duration="5:00",
+        )
+        mock_format_msg.return_value = "<b>Test Video</b>\nContent..."
         mock_create_doc.return_value = (b"document bytes", "2026-04-25_test-video.md")
 
-        # The reply_text for the status message returns a mock we can track
         status_msg = AsyncMock()
         mock_update.message.reply_text.return_value = status_msg
 
         await url_message_handler(mock_update, mock_context)
 
-        # Verify the processing chain was called
         mock_detect.assert_called_once()
-        mock_metadata.assert_called_once_with("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-        mock_transcript.assert_called_once_with("dQw4w9WgXcQ", "en")
-        mock_get_provider.assert_called_once()
-        mock_summarize.assert_called_once()
+        mock_transcribe.assert_called_once()
         mock_format_msg.assert_called_once()
         mock_create_doc.assert_called_once()
-
-        # Document should be sent
         mock_update.message.reply_document.assert_called_once()
 
     @pytest.mark.asyncio
     @patch("mediakit.bot.handlers.format_error_message")
-    @patch("mediakit.bot.handlers.get_youtube_metadata")
     @patch("mediakit.bot.handlers.detect_url_type")
     async def test_video_not_found_error(
         self,
         mock_detect,
-        mock_metadata,
         mock_format_error,
         mock_update,
         mock_context,
@@ -373,92 +317,16 @@ class TestUrlMessageHandler:
 
         mock_update.message.text = "https://www.youtube.com/watch?v=invalid"
         mock_detect.return_value = URLType.youtube
-        mock_metadata.side_effect = VideoNotFoundError("Video not found. Check the URL")
         mock_format_error.return_value = "<b>Error</b>\n\nVideo not found. Check the URL"
 
         status_msg = AsyncMock()
         mock_update.message.reply_text.return_value = status_msg
 
-        await url_message_handler(mock_update, mock_context)
+        with patch("mediakit.bot.handlers.transcribe_youtube", side_effect=VideoNotFoundError("Video not found. Check the URL")):
+            await url_message_handler(mock_update, mock_context)
 
-        # Should edit status message with error
         status_msg.edit_text.assert_called()
         mock_format_error.assert_called_once_with("Video not found. Check the URL")
-
-    @pytest.mark.asyncio
-    @patch("mediakit.bot.handlers.format_error_message")
-    @patch("mediakit.bot.handlers.get_youtube_transcript")
-    @patch("mediakit.bot.handlers.get_youtube_metadata")
-    @patch("mediakit.bot.handlers.detect_url_type")
-    async def test_transcript_not_available_error(
-        self,
-        mock_detect,
-        mock_metadata,
-        mock_transcript,
-        mock_format_error,
-        mock_update,
-        mock_context,
-    ):
-        from mediakit.transcribers.youtube import TranscriptNotAvailableError
-
-        mock_update.message.text = "https://www.youtube.com/watch?v=abc123"
-        mock_detect.return_value = URLType.youtube
-        mock_metadata.return_value = {
-            "title": "No Transcript Video",
-            "channel": "Ch",
-            "duration": "3:00",
-            "video_id": "abc123",
-            "url": "https://www.youtube.com/watch?v=abc123",
-        }
-        mock_transcript.side_effect = TranscriptNotAvailableError("Transcripts are disabled")
-        mock_format_error.return_value = "<b>Error</b>\n\nTranscripts are disabled"
-
-        status_msg = AsyncMock()
-        mock_update.message.reply_text.return_value = status_msg
-
-        await url_message_handler(mock_update, mock_context)
-
-        status_msg.edit_text.assert_called()
-        mock_format_error.assert_called_once_with("Transcripts are disabled")
-
-    @pytest.mark.asyncio
-    @patch("mediakit.bot.handlers.format_error_message")
-    @patch("mediakit.bot.handlers.get_provider")
-    @patch("mediakit.bot.handlers.get_youtube_transcript")
-    @patch("mediakit.bot.handlers.get_youtube_metadata")
-    @patch("mediakit.bot.handlers.detect_url_type")
-    async def test_llm_connection_error(
-        self,
-        mock_detect,
-        mock_metadata,
-        mock_transcript,
-        mock_get_provider,
-        mock_format_error,
-        mock_update,
-        mock_context,
-    ):
-        from mediakit.summarizer.providers import LLMConnectionError
-
-        mock_update.message.text = "https://www.youtube.com/watch?v=abc123"
-        mock_detect.return_value = URLType.youtube
-        mock_metadata.return_value = {
-            "title": "Test",
-            "channel": "Ch",
-            "duration": "1:00",
-            "video_id": "abc123",
-            "url": "https://www.youtube.com/watch?v=abc123",
-        }
-        mock_transcript.return_value = "transcript text"
-        mock_get_provider.side_effect = LLMConnectionError("Ollama is not running")
-        mock_format_error.return_value = "<b>Error</b>\n\nOllama is not running"
-
-        status_msg = AsyncMock()
-        mock_update.message.reply_text.return_value = status_msg
-
-        await url_message_handler(mock_update, mock_context)
-
-        status_msg.edit_text.assert_called()
-        mock_format_error.assert_called_once_with("Ollama is not running")
 
     @pytest.mark.asyncio
     @patch("mediakit.bot.handlers.format_error_message")

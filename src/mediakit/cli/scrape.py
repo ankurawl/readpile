@@ -46,7 +46,7 @@ async def _scrape_single_url(
         item = None
 
     if item is None or len(item.text.strip()) < _MIN_ARTICLE_LENGTH:
-        item = scrape_webpage(url, page)
+        item = await scrape_webpage(url, page)
 
     return item
 

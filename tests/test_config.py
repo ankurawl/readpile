@@ -11,10 +11,11 @@ from mediakit.core.config import load_config, get_config_path, DEFAULTS
 
 def test_defaults():
     config = load_config()
-    assert config["summarize"]["provider"] == "ollama"
+    assert config["general"]["auto_archive"] is False
     assert config["scrape"]["headless"] is True
     assert config["transcribe"]["engine"] == "auto"
     assert config["crawl"]["max_depth"] == 10
+    assert "summarize" not in config
 
 
 # --- get_config_path ---
@@ -34,9 +35,9 @@ def test_config_path_env(monkeypatch):
 
 
 def test_env_var_override(monkeypatch):
-    monkeypatch.setenv("OLLAMA_HOST", "http://custom:1234")
+    monkeypatch.setenv("HF_TOKEN", "test-token-123")
     config = load_config()
-    assert config["summarize"]["ollama"]["host"] == "http://custom:1234"
+    assert config["transcribe"]["hf_token"] == "test-token-123"
 
 
 # --- TOML file loading ---
@@ -44,18 +45,17 @@ def test_env_var_override(monkeypatch):
 
 def test_toml_file_loading(tmp_path, monkeypatch):
     config_file = tmp_path / "config.toml"
-    config_file.write_text('[summarize]\nprovider = "claude"\n')
+    config_file.write_text('[scrape]\nheadless = false\n')
     monkeypatch.setenv("MEDIAKIT_CONFIG", str(config_file))
     config = load_config()
-    assert config["summarize"]["provider"] == "claude"
-    # Other defaults still present
-    assert config["scrape"]["headless"] is True
+    assert config["scrape"]["headless"] is False
+    assert config["transcribe"]["engine"] == "auto"
 
 
 # --- CLI overrides ---
 
 
 def test_cli_overrides():
-    overrides = {"summarize": {"provider": "openai"}}
+    overrides = {"crawl": {"max_depth": 5}}
     config = load_config(cli_overrides=overrides)
-    assert config["summarize"]["provider"] == "openai"
+    assert config["crawl"]["max_depth"] == 5

@@ -4,10 +4,10 @@ import pytest
 
 from mediakit.bot.telegram_formatter import (
     TELEGRAM_MSG_LIMIT,
-    create_summary_document,
+    create_content_document,
     format_error_message,
     format_processing_status,
-    format_summary_message,
+    format_content_message,
 )
 
 
@@ -22,91 +22,85 @@ def sample_metadata():
 
 
 @pytest.fixture
-def sample_summary():
+def sample_content():
     return (
-        "## Summary\n"
-        "This is a test summary about an interesting topic.\n\n"
-        "## Key Takeaways\n"
+        "## Introduction\n"
+        "This is a test article about an interesting topic.\n\n"
+        "## Key Points\n"
         "- Point 1\n"
         "- Point 2\n"
         "- Point 3\n\n"
-        "## Learnings\n"
+        "## Conclusion\n"
         "- Learning 1\n"
         "- Learning 2"
     )
 
 
-class TestFormatSummaryMessage:
-    def test_detailed_style_includes_all_sections(self, sample_metadata, sample_summary):
-        msg = format_summary_message(sample_metadata, sample_summary, style="detailed")
+class TestFormatContentMessage:
+    def test_detailed_style_includes_all_content(self, sample_metadata, sample_content):
+        msg = format_content_message(sample_metadata, sample_content, style="detailed")
         assert "<b>Test Video Title</b>" in msg
         assert "Test Channel" in msg
         assert "10:30" in msg
-        assert "Summary" in msg
-        assert "Key Takeaways" in msg
-        assert "Learnings" in msg
+        assert "Introduction" in msg
+        assert "Key Points" in msg
+        assert "Conclusion" in msg
 
-    def test_brief_style_only_key_takeaways(self, sample_metadata, sample_summary):
-        msg = format_summary_message(sample_metadata, sample_summary, style="brief")
+    def test_brief_style_truncates(self, sample_metadata):
+        long_content = "A" * 1000
+        msg = format_content_message(sample_metadata, long_content, style="brief")
         assert "<b>Test Video Title</b>" in msg
-        assert "Key Takeaways" in msg
-        # The brief style should extract only the Key Takeaways section
-        assert "Point 1" in msg
+        assert "..." in msg
+        assert len(msg) < len(long_content)
+
+    def test_brief_style_short_content_no_ellipsis(self, sample_metadata):
+        short_content = "Short text."
+        msg = format_content_message(sample_metadata, short_content, style="brief")
+        assert "Short text." in msg
+        assert "..." not in msg
 
     def test_message_truncation(self, sample_metadata):
-        # Create a summary that exceeds the Telegram limit
-        long_summary = "## Summary\n" + ("A" * (TELEGRAM_MSG_LIMIT + 1000))
-        msg = format_summary_message(sample_metadata, long_summary, style="detailed")
+        long_content = "A" * (TELEGRAM_MSG_LIMIT + 1000)
+        msg = format_content_message(sample_metadata, long_content, style="detailed")
         assert len(msg) <= TELEGRAM_MSG_LIMIT
-        assert "[Full summary attached as file]" in msg
+        assert "[Full content attached as file]" in msg
 
-    def test_includes_url(self, sample_metadata, sample_summary):
-        msg = format_summary_message(sample_metadata, sample_summary)
+    def test_includes_url(self, sample_metadata, sample_content):
+        msg = format_content_message(sample_metadata, sample_content)
         assert sample_metadata["url"] in msg
 
-    def test_default_style_is_detailed(self, sample_metadata, sample_summary):
-        msg = format_summary_message(sample_metadata, sample_summary)
-        assert "Summary" in msg
-        assert "Learnings" in msg
+    def test_default_style_is_detailed(self, sample_metadata, sample_content):
+        msg = format_content_message(sample_metadata, sample_content)
+        assert "Introduction" in msg
+        assert "Conclusion" in msg
 
-    def test_markdown_headings_to_html_bold(self, sample_metadata, sample_summary):
-        msg = format_summary_message(sample_metadata, sample_summary, style="detailed")
-        # ## headings should be converted to <b> tags
-        assert "<b>Summary</b>" in msg or "<b>Key Takeaways</b>" in msg
+    def test_markdown_headings_to_html_bold(self, sample_metadata, sample_content):
+        msg = format_content_message(sample_metadata, sample_content, style="detailed")
+        assert "<b>Introduction</b>" in msg or "<b>Key Points</b>" in msg
 
 
-class TestCreateSummaryDocument:
-    def test_returns_bytes_and_filename(self, sample_metadata, sample_summary):
-        doc_bytes, filename = create_summary_document(
-            sample_metadata, sample_summary, "This is the transcript."
-        )
+class TestCreateContentDocument:
+    def test_returns_bytes_and_filename(self, sample_metadata, sample_content):
+        doc_bytes, filename = create_content_document(sample_metadata, sample_content)
         assert isinstance(doc_bytes, bytes)
         assert isinstance(filename, str)
         assert filename.endswith(".md")
 
-    def test_document_contains_metadata(self, sample_metadata, sample_summary):
-        doc_bytes, _ = create_summary_document(
-            sample_metadata, sample_summary, "transcript text"
-        )
+    def test_document_contains_metadata(self, sample_metadata, sample_content):
+        doc_bytes, _ = create_content_document(sample_metadata, sample_content)
         content = doc_bytes.decode("utf-8")
         assert "Test Video Title" in content
         assert "Test Channel" in content
         assert "10:30" in content
 
-    def test_document_contains_summary_and_transcript(self, sample_metadata, sample_summary):
-        transcript = "This is the full transcript."
-        doc_bytes, _ = create_summary_document(
-            sample_metadata, sample_summary, transcript
-        )
-        content = doc_bytes.decode("utf-8")
-        assert sample_summary in content
-        assert transcript in content
+    def test_document_contains_content(self, sample_metadata, sample_content):
+        doc_bytes, _ = create_content_document(sample_metadata, sample_content)
+        decoded = doc_bytes.decode("utf-8")
+        assert sample_content in decoded
+        assert "## Full Transcript" not in decoded
 
-    def test_filename_contains_sanitized_title(self, sample_metadata, sample_summary):
-        _, filename = create_summary_document(
-            sample_metadata, sample_summary, "transcript"
-        )
-        # Filename should contain the date and a sanitized title
+    def test_filename_contains_sanitized_title(self, sample_metadata, sample_content):
+        _, filename = create_content_document(sample_metadata, sample_content)
         assert "test-video-title" in filename
 
 
@@ -130,8 +124,11 @@ class TestFormatProcessingStatus:
         assert format_processing_status("scraping") == "Scraping article content..."
         assert format_processing_status("downloading") == "Downloading audio..."
         assert format_processing_status("transcribing") == "Transcribing audio..."
-        assert format_processing_status("summarizing") == "Summarizing with LLM..."
         assert format_processing_status("formatting") == "Formatting output..."
+
+    def test_summarizing_step_removed(self):
+        msg = format_processing_status("summarizing")
+        assert msg == "summarizing..."
 
     def test_unknown_step_falls_back(self):
         msg = format_processing_status("custom_step")

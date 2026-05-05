@@ -36,7 +36,7 @@ info "Detected OS: $OS ($ARCH)"
 ERRORS=0
 
 # ── 1. Check Python version ──────────────────────────────────────────
-step "1/10  Checking Python version"
+step "1/8  Checking Python version"
 
 PYTHON=""
 for candidate in python3 python; do
@@ -67,7 +67,7 @@ fi
 success "Python $PY_VERSION ($($PYTHON --version 2>&1))"
 
 # ── 2. Create virtual environment ────────────────────────────────────
-step "2/10  Creating virtual environment"
+step "2/8  Creating virtual environment"
 
 if [ -d ".venv" ]; then
     info "Virtual environment already exists at .venv/"
@@ -95,9 +95,9 @@ pip install --upgrade pip --quiet
 success "pip upgraded"
 
 # ── 3. Install Python dependencies ──────────────────────────────────
-step "3/10  Installing Python dependencies"
+step "3/8  Installing Python dependencies"
 
-info "Installing mediakit with all extras (base + audio + bot + claude + openai + dev)..."
+info "Installing mediakit with all extras (base + audio + bot + mcp + dev)..."
 if pip install -e ".[all,dev]" --quiet; then
     success "All Python dependencies installed"
 else
@@ -106,7 +106,7 @@ else
 fi
 
 # ── 4. Install Playwright browser ───────────────────────────────────
-step "4/10  Installing Playwright Chromium browser"
+step "4/8  Installing Playwright Chromium browser"
 
 if command -v playwright &>/dev/null || [ -f ".venv/bin/playwright" ]; then
     info "Installing Chromium for Playwright..."
@@ -134,7 +134,7 @@ else
 fi
 
 # ── 5. Check ffmpeg ──────────────────────────────────────────────────
-step "5/10  Checking ffmpeg"
+step "5/8  Checking ffmpeg"
 
 if command -v ffmpeg &>/dev/null; then
     FFMPEG_VERSION=$(ffmpeg -version 2>&1 | head -1 | awk '{print $3}')
@@ -150,39 +150,8 @@ else
     ERRORS=$((ERRORS + 1))
 fi
 
-# ── 6. Check Ollama ─────────────────────────────────────────────────
-step "6/10  Checking Ollama"
-
-if command -v ollama &>/dev/null; then
-    success "Ollama found"
-else
-    warn "Ollama not found. Local LLM summarization will not work."
-    echo ""
-    if [ "$OS" = "Darwin" ]; then
-        warn "Install with:  brew install ollama"
-    else
-        warn "Install with:  curl -fsSL https://ollama.com/install.sh | sh"
-    fi
-    ERRORS=$((ERRORS + 1))
-fi
-
-# ── 7. Pull default Ollama model ────────────────────────────────────
-step "7/10  Pulling default Ollama model"
-
-if command -v ollama &>/dev/null; then
-    info "Pulling llama3.2 (this may take a few minutes on first run)..."
-    if ollama pull llama3.2 2>/dev/null; then
-        success "llama3.2 model ready"
-    else
-        warn "Could not pull llama3.2. Is Ollama running? Try: ollama serve"
-        ERRORS=$((ERRORS + 1))
-    fi
-else
-    info "Skipping model pull (Ollama not installed)"
-fi
-
-# ── 8. Detect GPU ───────────────────────────────────────────────────
-step "8/10  Detecting GPU"
+# ── 6. Detect GPU ───────────────────────────────────────────────────
+step "6/8  Detecting GPU"
 
 GPU_DETECTED=""
 if [ "$OS" = "Darwin" ]; then
@@ -202,8 +171,8 @@ elif [ "$OS" = "Linux" ]; then
     fi
 fi
 
-# ── 9. Generate config file ─────────────────────────────────────────
-step "9/10  Generating config file"
+# ── 7. Generate config file ─────────────────────────────────────────
+step "7/8  Generating config file"
 
 CONFIG_DIR="$HOME/.mediakit"
 CONFIG_FILE="$CONFIG_DIR/config.toml"
@@ -221,8 +190,8 @@ else
     fi
 fi
 
-# ── 10. Run quick tests ─────────────────────────────────────────────
-step "10/10  Running quick test suite"
+# ── 8. Run quick tests ─────────────────────────────────────────────
+step "8/8  Running quick test suite"
 
 if [ -d "tests" ]; then
     info "Running fast tests (excluding slow, network, audio)..."
@@ -254,7 +223,7 @@ echo ""
 echo "  Quick start:"
 echo "    scrape https://example.com/blog-post"
 echo "    transcribe https://youtube.com/watch?v=..."
-echo "    summarize input.md"
+echo "    content https://example.com/article"
 echo "    crawl rss https://blog.example.com/feed"
 echo ""
 echo "  Run tests:"

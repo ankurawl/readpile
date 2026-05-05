@@ -67,7 +67,6 @@ def main() -> None:
         print(f"ADMIN_CHAT_ID must be an integer, got: {admin_chat_id_str}")
         sys.exit(1)
 
-    model = config.get("summarize", {}).get("ollama", {}).get("model", "llama3.2")
     data_dir = os.getenv("DATA_DIR", "./data")
     os.makedirs(data_dir, exist_ok=True)
 
@@ -75,7 +74,6 @@ def main() -> None:
 
     app.bot_data["config"] = {
         "admin_chat_id": admin_chat_id,
-        "model": model,
         "data_dir": data_dir,
         **config,
     }

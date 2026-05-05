@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "mediakit": {
+      "command": "mediakit-mcp",
+      "args": [],
+      "type": "stdio"
+    }
+  }
+}

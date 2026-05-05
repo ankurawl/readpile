@@ -88,7 +88,7 @@ def _crawl_blog(url: str, max_depth: int, max_pages: int, login: bool) -> list[s
 
             context = await browser.new_context(**context_kwargs)
             try:
-                crawler = BlogCrawler(context, url, max_depth=max_depth, max_pages=max_pages)
+                crawler = BlogCrawler(context, url, max_posts=max_pages)
                 urls = await crawler.crawl()
                 return urls
             finally:

@@ -15,14 +15,7 @@ DEFAULTS: dict = {
         "output_dir": "~/mediakit-output",
         "date_format": "YYYY-MM-DD",
         "filename_max_length": 80,
-    },
-    "summarize": {
-        "provider": "ollama",
-        "default_length": "medium",
-        "ollama": {"model": "llama3.2", "host": "http://localhost:11434"},
-        "claude": {"model": "claude-sonnet-4-20250514"},
-        "openai": {"model": "gpt-4o"},
-        "custom": {"endpoint": "", "model": ""},
+        "auto_archive": False,
     },
     "transcribe": {
         "engine": "auto",
@@ -49,12 +42,8 @@ DEFAULTS: dict = {
 # ---------------------------------------------------------------------------
 
 ENV_MAP: dict[str, tuple[str, ...]] = {
-    "ANTHROPIC_API_KEY": ("summarize", "claude", "api_key"),
-    "OPENAI_API_KEY": ("summarize", "openai", "api_key"),
-    "MEDIAKIT_LLM_API_KEY": ("summarize", "custom", "api_key"),
     "HF_TOKEN": ("transcribe", "hf_token"),
     "TELEGRAM_BOT_TOKEN": ("bot", "token"),
-    "OLLAMA_HOST": ("summarize", "ollama", "host"),
 }
 
 # ---------------------------------------------------------------------------
