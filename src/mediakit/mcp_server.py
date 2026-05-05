@@ -1,4 +1,4 @@
-"""MCP server — expose mediakit tools via Model Context Protocol."""
+"""MCP server — expose mediakit's library tools via Model Context Protocol."""
 
 from __future__ import annotations
 
@@ -96,14 +96,14 @@ def _create_server():
         content_type: str = "article",
         dir: str | None = None,
     ) -> str:
-        """Save content to disk as a markdown file with YAML front matter.
+        """Save content to your library as a markdown file with YAML front matter.
 
         Args:
-            content: The text content to archive.
+            content: The text content to save.
             title: Title for the content.
             source_url: Original source URL.
             content_type: One of: article, youtube, audio, podcast, webpage.
-            dir: Output directory (default: ~/mediakit-output or config value).
+            dir: Library directory (default: ~/mediakit-output or config value).
 
         Returns the path to the saved file.
         """

@@ -1,8 +1,8 @@
 """CLI — content command.
 
 Convenience orchestrator that auto-detects URL/source type and routes to
-the correct extraction brick (transcribe, scrape, crawl), then optionally
-archives the result.
+the correct extractor (transcribe, scrape, crawl), then optionally
+saves the result to your library.
 """
 
 from __future__ import annotations
@@ -118,7 +118,7 @@ def main(
         help="Force archiving on or off (default: use config auto_archive).",
     ),
 ) -> None:
-    """Auto-detect source type, extract content, and optionally archive."""
+    """Auto-detect source type, extract content, and optionally save to library."""
 
     config = load_config()
     general_cfg = config.get("general", {})

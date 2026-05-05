@@ -1,6 +1,6 @@
 # mediakit
 
-**Convert any media into readable text — in seconds.** Scrape articles, transcribe YouTube videos, crawl entire blogs, and archive everything as Markdown. Use it from the command line, or let your LLM call it directly via MCP.
+**Your personal library for the modern web.** Collect articles, transcribe videos, crawl entire blogs — then search, shortlist, and revisit anything on your own terms. Use it from the command line, or let your LLM curate your library directly via MCP.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)]()
@@ -10,17 +10,17 @@
 
 ## What is mediakit?
 
-mediakit turns web content into clean, structured text you can actually work with. Point it at a URL — a blog post, a YouTube video, a podcast RSS feed, a documentation site — and it gives you back Markdown with metadata, ready to read, search, summarize, or feed into any workflow.
+The best content on the web is scattered across blogs, YouTube channels, podcasts, and documentation sites. mediakit brings it all into one place — your personal library. Collect anything worth keeping, search across everything you've saved, and come back to it whenever you're ready.
 
-**The problem it solves:** You want to consume a 45-minute conference talk, catch up on 20 blog posts from last week, or archive an entire documentation site before it goes offline. Doing this manually means clicking through pages, copying text, waiting for videos, and losing formatting. mediakit automates all of that — the browser rendering, the transcript extraction, the feed parsing, the file organization — so you get straight to the content.
+**The problem it solves:** You follow dozens of sources — conference talks, newsletters, technical blogs, podcast episodes, reference docs. Keeping up means clicking through pages, waiting for videos, copying text, and losing track of what you've already consumed. mediakit handles the collecting so you can focus on the reading — catch up when you have time, skim what matters, save the rest for later.
 
 ### What you can do with it
 
-- **Catch up fast** — Pull the last 10 posts from a blog, 5 episodes from a podcast feed, or a full YouTube playlist. Pipe them into your LLM and ask for a single consolidated briefing.
-- **Build a personal knowledge base** — Archive articles, transcripts, and documentation as searchable Markdown files. Everything gets clean filenames, dates, and metadata automatically.
-- **Give your LLM eyes and ears** — Connect mediakit as an MCP server and your AI assistant can read any webpage, watch any YouTube video, or crawl any site on demand.
-- **Create custom digests** — Combine content from multiple sources (RSS feeds + blog crawls + video transcripts) into a single stream, then process it however you want — summarize, translate, extract action items, generate study notes.
-- **Research at scale** — Crawl an entire documentation site or blog archive, extract every page, and have it all in one local directory as Markdown files you can grep, analyze, or feed to an LLM.
+- **Build your library** — Collect articles, transcripts, and documentation into a personal archive you own. Search across everything, revisit old reads, and keep a growing reference collection that's always available.
+- **Catch up on your terms** — Pull the last 10 posts from a blog, 5 episodes from a podcast, or a full YouTube playlist. Skim now, read deeply later, or save as reference material — your schedule, your pace.
+- **Create custom digests** — Combine content from multiple sources into a single briefing. Shortlist the pieces that matter, summarize the rest, and start your day already caught up.
+- **Give your LLM eyes and ears** — Connect mediakit as an MCP server and your AI assistant can read any webpage, watch any YouTube video, or crawl any site — then help you search, compare, and make sense of it all.
+- **Research at scale** — Crawl an entire documentation site or blog archive. Search across hundreds of pages locally, pull out what's relevant, and build a focused reference collection for any project.
 
 ### What it can extract
 
@@ -48,7 +48,7 @@ mediakit turns web content into clean, structured text you can actually work wit
                           (auto-detect)
 ```
 
-Tools output **ContentItems** — Markdown documents with YAML front matter — that pipe cleanly between commands, work with any Markdown viewer, and are easy for LLMs to parse:
+Every piece of content becomes a **ContentItem** — a Markdown document with YAML front matter — that pipes cleanly between commands, works with any Markdown viewer, and is easy for LLMs to parse. Think of each one as a book on your shelf:
 
 ```markdown
 ---
@@ -96,7 +96,7 @@ content https://example.com/post --archive
 
 ### Use from an LLM (via MCP)
 
-mediakit ships as an [MCP server](https://modelcontextprotocol.io/) that any compatible LLM client can discover and use. Once connected, your LLM can scrape pages, transcribe videos, crawl sites, and archive content — then use its own intelligence to summarize, compare, translate, or do whatever you ask.
+mediakit ships as an [MCP server](https://modelcontextprotocol.io/) that any compatible LLM client can discover and use. Once connected, your LLM becomes a librarian — it can collect pages, transcribe videos, crawl sites, and archive content into your library, then help you read, compare, or make sense of what you've gathered.
 
 **Claude Code** — auto-configured via `.mcp.json` at the repo root:
 
@@ -136,7 +136,7 @@ Available MCP tools:
 ### Morning briefing from multiple sources
 
 ```bash
-# Pull recent posts from 3 blogs + a podcast, combine into one stream
+# Collect today's reading from 3 blogs + a podcast into one folder
 {
   crawl https://blog-a.com/feed.xml --recent 3 | scrape --batch
   crawl https://blog-b.com/blog | scrape --batch
@@ -145,34 +145,34 @@ Available MCP tools:
 # Then ask your LLM: "Summarize today's briefing into 5 bullet points"
 ```
 
-### Archive a blog before it disappears
+### Save a blog before it disappears
 
 ```bash
 crawl https://closing-soon.com/blog | scrape --batch | archive --dir ./saved-blog/
-# Every post saved as YYYY-MM-DD_title-slug.md with full metadata
+# Every post preserved as YYYY-MM-DD_title-slug.md with full metadata
 ```
 
-### Research a topic across sources
+### Build a research library
 
 ```bash
 # Crawl docs, grab relevant videos, pull it all into one folder
 crawl https://docs.example.com --mode site --depth 3 | scrape --batch | archive --dir ./research/
 transcribe https://youtube.com/watch?v=related-talk | archive --dir ./research/
-# Now you have a complete research folder to analyze
+# Your research library — instantly searchable, LLM-ready
 ```
 
 ### Catch up on a podcast
 
 ```bash
 crawl https://podcast.com/feed.xml --recent 5
-# Returns 5 episode URLs — pipe to transcribe, then ask your LLM for highlights
+# Returns 5 episode URLs — pipe to transcribe, then read at your own pace
 ```
 
-### Download behind a login wall
+### Collect from behind a login wall
 
 ```bash
 crawl https://members.example.com/blog --login | scrape --batch | archive --dir ./members/
-# Opens a real browser for you to log in, then crawls with your session
+# Opens a real browser for you to log in, then collects with your session
 ```
 
 ---
@@ -253,7 +253,7 @@ content-bot status    # check if configured
 
 ## Archiving
 
-By default, content goes to stdout. Opt in to saving files with `--archive` or by setting `auto_archive = true` in config.
+By default, content goes to stdout. To add content to your library on disk, use `--archive` or set `auto_archive = true` in config.
 
 | Command | `auto_archive = false` (default) | `auto_archive = true` |
 |---------|----------------------------------|----------------------|
@@ -266,7 +266,7 @@ By default, content goes to stdout. Opt in to saving files with `--archive` or b
 
 ## Telegram Bot
 
-An optional Telegram bot — send it any URL and get back extracted content as a formatted message plus a downloadable Markdown document.
+An optional Telegram bot — send it any URL and it adds the content to your library. You get back a formatted message plus a downloadable Markdown document.
 
 ```bash
 pip install mediakit[bot]

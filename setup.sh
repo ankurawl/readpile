@@ -25,7 +25,7 @@ cd "$SCRIPT_DIR"
 echo -e "${BOLD}"
 echo "  ┌──────────────────────────────────┐"
 echo "  │       mediakit setup             │"
-echo "  │  Composable CLI media toolkit    │"
+echo "  │  Your personal media library     │"
 echo "  └──────────────────────────────────┘"
 echo -e "${NC}"
 

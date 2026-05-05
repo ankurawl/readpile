@@ -1,3 +1,3 @@
-"""mediakit — Composable CLI toolkit for consuming media."""
+"""mediakit — Your personal library for the modern web."""
 
 __version__ = "0.1.0"

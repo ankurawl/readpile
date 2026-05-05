@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mediakit"
 version = "0.1.0"
-description = "Composable CLI toolkit for consuming media — scrape articles, transcribe videos, crawl feeds, archive content"
+description = "Your personal library for the modern web — collect articles, transcribe videos, crawl feeds, and archive as Markdown"
 requires-python = ">=3.10"
 license = "MIT"
 readme = "README.md"

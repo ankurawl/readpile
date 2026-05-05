@@ -1,4 +1,4 @@
-"""Telegram bot for mediakit — extract content from URLs via chat."""
+"""Telegram bot for mediakit — collect content from URLs into your library via chat."""
 
 from mediakit.bot.main import main
 

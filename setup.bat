@@ -6,7 +6,7 @@ setlocal enabledelayedexpansion
 echo.
 echo   +---------------------------------+
 echo   ^|       mediakit setup            ^|
-echo   ^|  Composable CLI media toolkit   ^|
+echo   ^|  Your personal media library    ^|
 echo   +---------------------------------+
 echo.
 

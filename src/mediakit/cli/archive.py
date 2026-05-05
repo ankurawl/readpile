@@ -1,6 +1,6 @@
 """CLI — archive command.
 
-Save ContentItems to disk as Markdown files with YAML front matter.
+Save ContentItems to your library as Markdown files with YAML front matter.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ def main(
         help="Process batch items from stdin.",
     ),
 ) -> None:
-    """Archive content items to disk as Markdown files."""
+    """Save content to your library as Markdown files."""
 
     # ------------------------------------------------------------------
     # Load config and resolve output directory

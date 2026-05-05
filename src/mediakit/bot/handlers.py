@@ -39,14 +39,14 @@ def _get_config(context: ContextTypes.DEFAULT_TYPE) -> dict:
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "Welcome to MediaKit Bot!\n\n"
-        "Send me any URL and I'll extract its content for you.\n"
+        "Send me any URL and I'll add it to your library.\n"
         "Supported: YouTube, blogs, articles, podcasts, audio/video.\n\n"
         "Commands:\n"
         "/help - List available commands\n"
         "/whoami - Show your chat ID\n"
         "/set_language <code> - Set transcript language\n"
         "/set_style <brief|detailed> - Set content style\n"
-        "/history - Show recently processed items"
+        "/history - Show recently collected items"
     )
 
 
@@ -58,12 +58,12 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/whoami - Show your chat ID\n"
         "/set_language <code> - Set transcript language (e.g., en, es, hi)\n"
         "/set_style <brief|detailed> - Set content style\n"
-        "/history - Show recently processed items\n\n"
+        "/history - Show recently collected items\n\n"
         "Admin commands:\n"
         "/admin_add <chat_id> - Add user to whitelist\n"
         "/admin_remove <chat_id> - Remove user from whitelist\n"
         "/admin_list - Show whitelisted users\n\n"
-        "Or just send any URL to extract its content!"
+        "Or just send any URL to add it to your library!"
     )
 
 

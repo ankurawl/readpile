@@ -1,6 +1,6 @@
 # mediakit
 
-Content extraction toolkit for LLMs. Scrape articles, transcribe videos, crawl feeds, and archive content.
+Content extraction toolkit for LLMs. Build a personal library from articles, videos, podcasts, and documentation.
 
 ## MCP Server
 
