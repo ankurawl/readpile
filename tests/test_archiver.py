@@ -1,7 +1,7 @@
 from datetime import date
 from pathlib import Path
-from mediakit.core.archiver import sanitize_filename, generate_filename, Archiver
-from mediakit.core.models import ContentItem, ContentType
+from readpile.core.archiver import sanitize_filename, generate_filename, Archiver
+from readpile.core.models import ContentItem, ContentType
 
 # sanitize_filename tests
 def test_sanitize_basic():

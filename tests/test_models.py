@@ -1,8 +1,8 @@
-"""Tests for mediakit.core.models — ContentItem and ContentType."""
+"""Tests for readpile.core.models — ContentItem and ContentType."""
 
 from datetime import date
 
-from mediakit.core.models import ContentItem, ContentType
+from readpile.core.models import ContentItem, ContentType
 
 
 # --- ContentType enum ---

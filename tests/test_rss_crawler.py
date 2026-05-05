@@ -1,5 +1,5 @@
 from unittest.mock import patch, MagicMock
-from mediakit.crawlers.rss import crawl_rss, _get_entry_url, _has_audio_enclosure
+from readpile.crawlers.rss import crawl_rss, _get_entry_url, _has_audio_enclosure
 
 MOCK_RSS_FEED = {
     "feed": {"title": "Test Podcast"},
@@ -36,7 +36,7 @@ MOCK_BLOG_FEED = {
 }
 
 
-@patch("mediakit.crawlers.rss.feedparser.parse")
+@patch("readpile.crawlers.rss.feedparser.parse")
 def test_crawl_podcast_rss(mock_parse):
     mock_parse.return_value = MagicMock(**MOCK_RSS_FEED)
     mock_parse.return_value.entries = [MagicMock(**e) for e in MOCK_RSS_FEED["entries"]]
@@ -54,7 +54,7 @@ def test_crawl_podcast_rss(mock_parse):
     assert any("mp3" in u for u in urls)
 
 
-@patch("mediakit.crawlers.rss.feedparser.parse")
+@patch("readpile.crawlers.rss.feedparser.parse")
 def test_crawl_blog_rss(mock_parse):
     mock_parse.return_value = MagicMock(**MOCK_BLOG_FEED)
     mock_parse.return_value.entries = [MagicMock(**e) for e in MOCK_BLOG_FEED["entries"]]
@@ -68,7 +68,7 @@ def test_crawl_blog_rss(mock_parse):
     assert "https://blog.com/post-2" in urls
 
 
-@patch("mediakit.crawlers.rss.feedparser.parse")
+@patch("readpile.crawlers.rss.feedparser.parse")
 def test_crawl_rss_recent(mock_parse):
     mock_parse.return_value = MagicMock(**MOCK_RSS_FEED)
     mock_parse.return_value.entries = [MagicMock(**e) for e in MOCK_RSS_FEED["entries"]]
@@ -81,7 +81,7 @@ def test_crawl_rss_recent(mock_parse):
     assert len(urls) == 2
 
 
-@patch("mediakit.crawlers.rss.feedparser.parse")
+@patch("readpile.crawlers.rss.feedparser.parse")
 def test_crawl_rss_empty(mock_parse):
     mock_parse.return_value = MagicMock(entries=[], bozo=False)
     urls = crawl_rss("https://empty.com/feed.xml")

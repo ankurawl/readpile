@@ -1,24 +1,24 @@
-"""Tests for mediakit.transcribers.audio — audio transcription."""
+"""Tests for readpile.transcribers.audio — audio transcription."""
 
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
 
-from mediakit.core.models import ContentItem, ContentType
+from readpile.core.models import ContentItem, ContentType
 
 
 @pytest.mark.audio
 class TestAudioTranscriberImports:
     def test_check_ffmpeg(self):
-        from mediakit.transcribers.audio import _check_ffmpeg
+        from readpile.transcribers.audio import _check_ffmpeg
         try:
             _check_ffmpeg()
         except SystemExit:
             pytest.skip("ffmpeg not installed")
 
     def test_check_whisper_deps(self):
-        from mediakit.transcribers.audio import _check_whisper_deps
+        from readpile.transcribers.audio import _check_whisper_deps
         try:
             _check_whisper_deps()
         except SystemExit:
@@ -28,13 +28,13 @@ class TestAudioTranscriberImports:
 @pytest.mark.audio
 class TestTimestampFormatting:
     def test_format_seconds_to_timestamp(self):
-        from mediakit.transcribers.audio import _format_timestamp
+        from readpile.transcribers.audio import _format_timestamp
         assert _format_timestamp(0) == "[00:00:00]"
         assert _format_timestamp(65) == "[00:01:05]"
         assert _format_timestamp(3661) == "[01:01:01]"
 
     def test_format_large_timestamp(self):
-        from mediakit.transcribers.audio import _format_timestamp
+        from readpile.transcribers.audio import _format_timestamp
         result = _format_timestamp(7200)
         assert result == "[02:00:00]"
 

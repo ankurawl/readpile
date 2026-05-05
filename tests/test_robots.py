@@ -1,10 +1,10 @@
-"""Tests for mediakit.core.robots — robots.txt compliance checking."""
+"""Tests for readpile.core.robots — robots.txt compliance checking."""
 
 from unittest.mock import patch, MagicMock
 
 import pytest
 
-from mediakit.core.robots import RobotsChecker
+from readpile.core.robots import RobotsChecker
 
 
 class TestRobotsChecker:
@@ -21,7 +21,7 @@ class TestRobotsChecker:
         assert checker.crawl_delay() is None
 
     def test_user_agent(self):
-        assert RobotsChecker.USER_AGENT == "Mediakit/1.0"
+        assert RobotsChecker.USER_AGENT == "readpile/1.0"
 
     def test_load_handles_network_errors(self):
         checker = RobotsChecker("https://nonexistent.invalid/page")

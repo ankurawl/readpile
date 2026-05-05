@@ -1,10 +1,10 @@
 from datetime import date
 from unittest.mock import patch, MagicMock
-from mediakit.transcribers.youtube import (
+from readpile.transcribers.youtube import (
     get_youtube_metadata, get_youtube_transcript, transcribe_youtube,
     VideoNotFoundError, TranscriptNotAvailableError, _format_duration,
 )
-from mediakit.core.models import ContentType
+from readpile.core.models import ContentType
 import pytest
 
 def test_format_duration_with_hours():
@@ -16,7 +16,7 @@ def test_format_duration_minutes_only():
 def test_format_duration_zero():
     assert _format_duration(0) == "0:00"
 
-@patch("mediakit.transcribers.youtube.yt_dlp.YoutubeDL")
+@patch("readpile.transcribers.youtube.yt_dlp.YoutubeDL")
 def test_get_metadata(mock_ydl_cls):
     mock_ydl = MagicMock()
     mock_ydl_cls.return_value.__enter__ = MagicMock(return_value=mock_ydl)
@@ -35,7 +35,7 @@ def test_get_metadata(mock_ydl_cls):
     assert meta["duration"] == "10:00"
     assert meta["video_id"] == "abc123"
 
-@patch("mediakit.transcribers.youtube.yt_dlp.YoutubeDL")
+@patch("readpile.transcribers.youtube.yt_dlp.YoutubeDL")
 def test_get_metadata_not_found(mock_ydl_cls):
     import yt_dlp
     mock_ydl = MagicMock()
@@ -45,7 +45,7 @@ def test_get_metadata_not_found(mock_ydl_cls):
     with pytest.raises(VideoNotFoundError):
         get_youtube_metadata("https://youtube.com/watch?v=invalid")
 
-@patch("mediakit.transcribers.youtube.YouTubeTranscriptApi")
+@patch("readpile.transcribers.youtube.YouTubeTranscriptApi")
 def test_get_transcript(mock_api_cls):
     mock_api = MagicMock()
     mock_api_cls.return_value = mock_api
@@ -63,8 +63,8 @@ def test_get_transcript(mock_api_cls):
     assert "Hello world" in text
     assert len(text) > 0
 
-@patch("mediakit.transcribers.youtube.get_youtube_transcript")
-@patch("mediakit.transcribers.youtube.get_youtube_metadata")
+@patch("readpile.transcribers.youtube.get_youtube_transcript")
+@patch("readpile.transcribers.youtube.get_youtube_metadata")
 def test_transcribe_youtube(mock_meta, mock_transcript):
     mock_meta.return_value = {
         "title": "Full Test", "channel": "Ch", "duration": "5:00",

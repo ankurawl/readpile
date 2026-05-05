@@ -1,4 +1,4 @@
-"""Tests for mediakit.bot.whitelist — authorized user/chat management."""
+"""Tests for readpile.bot.whitelist — authorized user/chat management."""
 
 import json
 import os
@@ -6,7 +6,7 @@ import tempfile
 
 import pytest
 
-from mediakit.bot.whitelist import (
+from readpile.bot.whitelist import (
     add_to_whitelist,
     is_whitelisted,
     load_whitelist,

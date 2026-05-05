@@ -1,10 +1,10 @@
-# mediakit
+# readpile
 
 Content extraction toolkit for LLMs. Build a personal library from articles, videos, podcasts, and documentation.
 
 ## MCP Server
 
-mediakit exposes 5 tools via MCP (Model Context Protocol):
+readpile exposes 5 tools via MCP (Model Context Protocol):
 
 - **scrape** — Extract article/webpage content from a URL (YAML front matter + markdown)
 - **transcribe** — Transcribe YouTube videos or audio/video URLs
@@ -19,8 +19,8 @@ The `.mcp.json` at repo root auto-configures Claude Code. For other clients:
 ```json
 {
   "mcpServers": {
-    "mediakit": {
-      "command": "mediakit-mcp",
+    "readpile": {
+      "command": "readpile-mcp",
       "args": [],
       "type": "stdio"
     }
@@ -37,7 +37,7 @@ crawl URL                  # Discover content URLs
 archive < content.md       # Save to disk
 content URL                # Auto-detect and extract
 content URL --archive      # Extract + save to disk
-mediakit init              # Generate config file
+readpile init              # Generate config file
 content-bot start          # Start Telegram bot
 ```
 
@@ -65,7 +65,7 @@ pytest tests/ -v
 ## Project Structure
 
 ```
-src/mediakit/
+src/readpile/
 ├── cli/           # Typer CLI commands
 ├── scrapers/      # Article + webpage extraction
 ├── transcribers/  # YouTube + audio transcription

@@ -1,26 +1,26 @@
-"""Tests for mediakit.cli.init — config generation."""
+"""Tests for readpile.cli.init — config generation."""
 
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from mediakit.cli.init import _CONFIG_TEMPLATE
+from readpile.cli.init import _CONFIG_TEMPLATE
 
 
 class TestConfigTemplate:
     def test_template_has_auto_archive(self):
-        rendered = _CONFIG_TEMPLATE.format(output_dir="~/mediakit-output", auto_archive="false")
+        rendered = _CONFIG_TEMPLATE.format(output_dir="~/readpile-output", auto_archive="false")
         assert "auto_archive = false" in rendered
 
     def test_template_no_summarize_sections(self):
-        rendered = _CONFIG_TEMPLATE.format(output_dir="~/mediakit-output", auto_archive="false")
+        rendered = _CONFIG_TEMPLATE.format(output_dir="~/readpile-output", auto_archive="false")
         assert "[summarize]" not in rendered
         assert "ollama" not in rendered
         assert "claude" not in rendered.split("[")[0] if "[" in rendered else True
 
     def test_template_has_required_sections(self):
-        rendered = _CONFIG_TEMPLATE.format(output_dir="~/mediakit-output", auto_archive="false")
+        rendered = _CONFIG_TEMPLATE.format(output_dir="~/readpile-output", auto_archive="false")
         assert "[general]" in rendered
         assert "[transcribe]" in rendered
         assert "[scrape]" in rendered

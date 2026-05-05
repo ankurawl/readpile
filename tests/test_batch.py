@@ -1,5 +1,5 @@
 from datetime import date
-from mediakit.core.models import ContentItem, ContentType
+from readpile.core.models import ContentItem, ContentType
 
 def test_batch_delimiter_splitting():
     batch = "---\ntitle: \"A\"\nsource_url: u1\ncontent_type: article\n---\nBody A\n\n---CONTENT_ITEM---\n\n---\ntitle: \"B\"\nsource_url: u2\ncontent_type: youtube\n---\nBody B"

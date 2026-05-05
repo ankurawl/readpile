@@ -1,7 +1,7 @@
 from datetime import date
 from unittest.mock import patch
-from mediakit.scrapers.article import scrape_article, _extract_title, _extract_date, _extract_author, _extract_tags, _html_to_markdown, _clean_markdown
-from mediakit.core.models import ContentType
+from readpile.scrapers.article import scrape_article, _extract_title, _extract_date, _extract_author, _extract_tags, _html_to_markdown, _clean_markdown
+from readpile.core.models import ContentType
 from bs4 import BeautifulSoup
 
 SAMPLE_HTML = '''<!DOCTYPE html>

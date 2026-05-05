@@ -1,4 +1,4 @@
-# mediakit
+# readpile
 
 **Your personal library for the modern web.** Collect articles, transcribe videos, crawl entire blogs — then search, shortlist, and revisit anything on your own terms. Use it from the command line, or let your LLM curate your library directly via MCP.
 
@@ -8,18 +8,18 @@
 
 ---
 
-## What is mediakit?
+## What is readpile?
 
-The best content on the web is scattered across blogs, YouTube channels, podcasts, and documentation sites. mediakit brings it all into one place — your personal library. Collect anything worth keeping, search across everything you've saved, and come back to it whenever you're ready.
+The best content on the web is scattered across blogs, YouTube channels, podcasts, and documentation sites. readpile brings it all into one place — your personal library. Collect anything worth keeping, search across everything you've saved, and come back to it whenever you're ready.
 
-**The problem it solves:** You follow dozens of sources — conference talks, newsletters, technical blogs, podcast episodes, reference docs. Keeping up means clicking through pages, waiting for videos, copying text, and losing track of what you've already consumed. mediakit handles the collecting so you can focus on the reading — catch up when you have time, skim what matters, save the rest for later.
+**The problem it solves:** You follow dozens of sources — conference talks, newsletters, technical blogs, podcast episodes, reference docs. Keeping up means clicking through pages, waiting for videos, copying text, and losing track of what you've already consumed. readpile handles the collecting so you can focus on the reading — catch up when you have time, skim what matters, save the rest for later.
 
 ### What you can do with it
 
 - **Build your library** — Collect articles, transcripts, and documentation into a personal archive you own. Search across everything, revisit old reads, and keep a growing reference collection that's always available.
 - **Catch up on your terms** — Pull the last 10 posts from a blog, 5 episodes from a podcast, or a full YouTube playlist. Skim now, read deeply later, or save as reference material — your schedule, your pace.
 - **Create custom digests** — Combine content from multiple sources into a single briefing. Shortlist the pieces that matter, summarize the rest, and start your day already caught up.
-- **Give your LLM eyes and ears** — Connect mediakit as an MCP server and your AI assistant can read any webpage, watch any YouTube video, or crawl any site — then help you search, compare, and make sense of it all.
+- **Give your LLM eyes and ears** — Connect readpile as an MCP server and your AI assistant can read any webpage, watch any YouTube video, or crawl any site — then help you search, compare, and make sense of it all.
 - **Research at scale** — Crawl an entire documentation site or blog archive. Search across hundreds of pages locally, pull out what's relevant, and build a focused reference collection for any project.
 
 ### What it can extract
@@ -70,7 +70,7 @@ The full article text in clean Markdown...
 ### Install
 
 ```bash
-pip install mediakit
+pip install readpile
 playwright install chromium    # needed for web scraping
 ```
 
@@ -96,12 +96,12 @@ content https://example.com/post --archive
 
 ### Use from an LLM (via MCP)
 
-mediakit ships as an [MCP server](https://modelcontextprotocol.io/) that any compatible LLM client can discover and use. Once connected, your LLM becomes a librarian — it can collect pages, transcribe videos, crawl sites, and archive content into your library, then help you read, compare, or make sense of what you've gathered.
+readpile ships as an [MCP server](https://modelcontextprotocol.io/) that any compatible LLM client can discover and use. Once connected, your LLM becomes a librarian — it can collect pages, transcribe videos, crawl sites, and archive content into your library, then help you read, compare, or make sense of what you've gathered.
 
 **Claude Code** — auto-configured via `.mcp.json` at the repo root:
 
 ```bash
-pip install mediakit[mcp]
+pip install readpile[mcp]
 # Claude Code discovers the server automatically
 ```
 
@@ -110,8 +110,8 @@ pip install mediakit[mcp]
 ```json
 {
   "mcpServers": {
-    "mediakit": {
-      "command": "mediakit-mcp",
+    "readpile": {
+      "command": "readpile-mcp",
       "args": [],
       "type": "stdio"
     }
@@ -191,7 +191,7 @@ content --batch < urls.txt           # process multiple URLs
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--archive / --no-archive` | from config | Force archiving on or off |
-| `--dir` | `~/mediakit-output` | Output directory when archiving |
+| `--dir` | `~/readpile-output` | Output directory when archiving |
 | `--batch` | off | Read URLs from stdin (one per line) |
 
 ### `scrape` — Extract articles from web pages
@@ -234,12 +234,12 @@ scrape https://example.com/post | archive --dir ./saved/
 crawl URL | scrape --batch | archive --batch --dir ./blog/
 ```
 
-### `mediakit init` — Set up configuration
+### `readpile init` — Set up configuration
 
 ```bash
-mediakit init
+readpile init
 # Prompts: archive by default? output directory?
-# Writes ~/.mediakit/config.toml
+# Writes ~/.readpile/config.toml
 ```
 
 ### `content-bot` — Telegram bot
@@ -269,7 +269,7 @@ By default, content goes to stdout. To add content to your library on disk, use 
 An optional Telegram bot — send it any URL and it adds the content to your library. You get back a formatted message plus a downloadable Markdown document.
 
 ```bash
-pip install mediakit[bot]
+pip install readpile[bot]
 export TELEGRAM_BOT_TOKEN="your-bot-token"
 export ADMIN_CHAT_ID="your-telegram-chat-id"
 content-bot start
@@ -282,12 +282,12 @@ Supports `/set_language`, `/set_style brief|detailed`, `/history`, and admin whi
 ## Configuration
 
 ```bash
-mediakit init    # interactive setup, writes ~/.mediakit/config.toml
+readpile init    # interactive setup, writes ~/.readpile/config.toml
 ```
 
 ```toml
 [general]
-output_dir = "~/mediakit-output"      # where archived files go
+output_dir = "~/readpile-output"      # where archived files go
 auto_archive = false                  # archive by default? (overridden by --archive/--no-archive)
 date_format = "YYYY-MM-DD"
 filename_max_length = 80
@@ -311,19 +311,19 @@ max_pages = 100
 |---------------------|-------------|
 | `HF_TOKEN` | HuggingFace token for speaker diarization |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token |
-| `MEDIAKIT_CONFIG` | Override config file path |
+| `READPILE_CONFIG` | Override config file path |
 
 ---
 
 ## Installation
 
 ```bash
-pip install mediakit               # base: scraping, crawling, YouTube transcription
-pip install mediakit[audio]        # + Whisper transcription (torch, ffmpeg-python)
-pip install mediakit[bot]          # + Telegram bot
-pip install mediakit[mcp]          # + MCP server for LLM integration
-pip install mediakit[all]          # everything
-pip install mediakit[dev]          # + test/lint tools
+pip install readpile               # base: scraping, crawling, YouTube transcription
+pip install readpile[audio]        # + Whisper transcription (torch, ffmpeg-python)
+pip install readpile[bot]          # + Telegram bot
+pip install readpile[mcp]          # + MCP server for LLM integration
+pip install readpile[all]          # everything
+pip install readpile[dev]          # + test/lint tools
 
 playwright install chromium        # required for web scraping
 ```
@@ -331,8 +331,8 @@ playwright install chromium        # required for web scraping
 ### From source
 
 ```bash
-git clone https://github.com/anthropics/mediakit.git
-cd mediakit
+git clone https://github.com/ankurawl/readpile.git
+cd readpile
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,all]"
 playwright install chromium
@@ -350,7 +350,7 @@ playwright install chromium
 ## Project Structure
 
 ```
-src/mediakit/
+src/readpile/
 ├── cli/             # CLI entry points (one per command)
 ├── scrapers/        # Article + webpage content extraction
 ├── transcribers/    # YouTube captions + Whisper audio transcription

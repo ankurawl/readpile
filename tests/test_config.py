@@ -1,9 +1,9 @@
-"""Tests for mediakit.core.config — load_config, get_config_path, defaults."""
+"""Tests for readpile.core.config — load_config, get_config_path, defaults."""
 
 import os
 from pathlib import Path
 
-from mediakit.core.config import load_config, get_config_path, DEFAULTS
+from readpile.core.config import load_config, get_config_path, DEFAULTS
 
 
 # --- Defaults ---
@@ -27,7 +27,7 @@ def test_config_path_default():
 
 
 def test_config_path_env(monkeypatch):
-    monkeypatch.setenv("MEDIAKIT_CONFIG", "/tmp/custom.toml")
+    monkeypatch.setenv("READPILE_CONFIG", "/tmp/custom.toml")
     assert str(get_config_path()) == "/tmp/custom.toml"
 
 
@@ -46,7 +46,7 @@ def test_env_var_override(monkeypatch):
 def test_toml_file_loading(tmp_path, monkeypatch):
     config_file = tmp_path / "config.toml"
     config_file.write_text('[scrape]\nheadless = false\n')
-    monkeypatch.setenv("MEDIAKIT_CONFIG", str(config_file))
+    monkeypatch.setenv("READPILE_CONFIG", str(config_file))
     config = load_config()
     assert config["scrape"]["headless"] is False
     assert config["transcribe"]["engine"] == "auto"

@@ -1,4 +1,4 @@
-"""Tests for mediakit.bot.handlers — message and command handlers."""
+"""Tests for readpile.bot.handlers — message and command handlers."""
 
 import io
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -7,7 +7,7 @@ import pytest
 
 pytest.importorskip("telegram")
 
-from mediakit.bot.handlers import (
+from readpile.bot.handlers import (
     admin_add_handler,
     admin_list_handler,
     admin_remove_handler,
@@ -19,9 +19,9 @@ from mediakit.bot.handlers import (
     url_message_handler,
     whoami_handler,
 )
-from mediakit.bot.preferences import get_preferences, set_preference
-from mediakit.bot.whitelist import add_to_whitelist, is_whitelisted, load_whitelist
-from mediakit.core.detector import URLType
+from readpile.bot.preferences import get_preferences, set_preference
+from readpile.bot.whitelist import add_to_whitelist, is_whitelisted, load_whitelist
+from readpile.core.detector import URLType
 
 
 ADMIN_CHAT_ID = 12345
@@ -66,7 +66,7 @@ class TestStartHandler:
         await start_handler(mock_update, mock_context)
         mock_update.message.reply_text.assert_called_once()
         msg = mock_update.message.reply_text.call_args[0][0]
-        assert "MediaKit" in msg
+        assert "readpile" in msg
         assert "/help" in msg
 
 
@@ -146,7 +146,7 @@ class TestHistoryHandler:
 
     @pytest.mark.asyncio
     async def test_shows_history(self, mock_update, mock_context, data_dir):
-        from mediakit.bot.preferences import add_to_history
+        from readpile.bot.preferences import add_to_history
 
         add_to_history(ADMIN_CHAT_ID, {
             "title": "Test Video",
@@ -261,11 +261,11 @@ class TestUrlMessageHandler:
         mock_update.message.reply_text.assert_not_called()
 
     @pytest.mark.asyncio
-    @patch("mediakit.bot.handlers.add_to_history")
-    @patch("mediakit.bot.handlers.create_content_document")
-    @patch("mediakit.bot.handlers.format_content_message")
-    @patch("mediakit.bot.handlers.transcribe_youtube")
-    @patch("mediakit.bot.handlers.detect_url_type")
+    @patch("readpile.bot.handlers.add_to_history")
+    @patch("readpile.bot.handlers.create_content_document")
+    @patch("readpile.bot.handlers.format_content_message")
+    @patch("readpile.bot.handlers.transcribe_youtube")
+    @patch("readpile.bot.handlers.detect_url_type")
     async def test_youtube_url_happy_path(
         self,
         mock_detect,
@@ -276,7 +276,7 @@ class TestUrlMessageHandler:
         mock_update,
         mock_context,
     ):
-        from mediakit.core.models import ContentItem, ContentType
+        from readpile.core.models import ContentItem, ContentType
 
         mock_update.message.text = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
@@ -304,8 +304,8 @@ class TestUrlMessageHandler:
         mock_update.message.reply_document.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("mediakit.bot.handlers.format_error_message")
-    @patch("mediakit.bot.handlers.detect_url_type")
+    @patch("readpile.bot.handlers.format_error_message")
+    @patch("readpile.bot.handlers.detect_url_type")
     async def test_video_not_found_error(
         self,
         mock_detect,
@@ -313,7 +313,7 @@ class TestUrlMessageHandler:
         mock_update,
         mock_context,
     ):
-        from mediakit.transcribers.youtube import VideoNotFoundError
+        from readpile.transcribers.youtube import VideoNotFoundError
 
         mock_update.message.text = "https://www.youtube.com/watch?v=invalid"
         mock_detect.return_value = URLType.youtube
@@ -322,15 +322,15 @@ class TestUrlMessageHandler:
         status_msg = AsyncMock()
         mock_update.message.reply_text.return_value = status_msg
 
-        with patch("mediakit.bot.handlers.transcribe_youtube", side_effect=VideoNotFoundError("Video not found. Check the URL")):
+        with patch("readpile.bot.handlers.transcribe_youtube", side_effect=VideoNotFoundError("Video not found. Check the URL")):
             await url_message_handler(mock_update, mock_context)
 
         status_msg.edit_text.assert_called()
         mock_format_error.assert_called_once_with("Video not found. Check the URL")
 
     @pytest.mark.asyncio
-    @patch("mediakit.bot.handlers.format_error_message")
-    @patch("mediakit.bot.handlers.detect_url_type")
+    @patch("readpile.bot.handlers.format_error_message")
+    @patch("readpile.bot.handlers.detect_url_type")
     async def test_unexpected_error_handled_gracefully(
         self,
         mock_detect,

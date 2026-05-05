@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0", "setuptools-scm>=8.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mediakit"
+name = "readpile"
 version = "0.1.0"
 description = "Your personal library for the modern web — collect articles, transcribe videos, crawl feeds, and archive as Markdown"
 requires-python = ">=3.10"
@@ -43,18 +43,18 @@ dev = [
     "ruff>=0.1.0",
 ]
 all = [
-    "mediakit[audio,bot,mcp]",
+    "readpile[audio,bot,mcp]",
 ]
 
 [project.scripts]
-crawl = "mediakit.cli.crawl:app"
-scrape = "mediakit.cli.scrape:app"
-transcribe = "mediakit.cli.transcribe:app"
-archive = "mediakit.cli.archive:app"
-content = "mediakit.cli.content:app"
-mediakit = "mediakit.cli.init:app"
-content-bot = "mediakit.cli.bot:app"
-mediakit-mcp = "mediakit.mcp_server:main"
+crawl = "readpile.cli.crawl:app"
+scrape = "readpile.cli.scrape:app"
+transcribe = "readpile.cli.transcribe:app"
+archive = "readpile.cli.archive:app"
+content = "readpile.cli.content:app"
+readpile = "readpile.cli.init:app"
+content-bot = "readpile.cli.bot:app"
+readpile-mcp = "readpile.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

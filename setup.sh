@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup.sh — mediakit installer for macOS and Linux
+# setup.sh — readpile installer for macOS and Linux
 # Usage: bash setup.sh
 set -euo pipefail
 
@@ -24,7 +24,7 @@ cd "$SCRIPT_DIR"
 
 echo -e "${BOLD}"
 echo "  ┌──────────────────────────────────┐"
-echo "  │       mediakit setup             │"
+echo "  │       readpile setup            │"
 echo "  │  Your personal media library     │"
 echo "  └──────────────────────────────────┘"
 echo -e "${NC}"
@@ -97,7 +97,7 @@ success "pip upgraded"
 # ── 3. Install Python dependencies ──────────────────────────────────
 step "3/8  Installing Python dependencies"
 
-info "Installing mediakit with all extras (base + audio + bot + mcp + dev)..."
+info "Installing readpile with all extras (base + audio + bot + mcp + dev)..."
 if pip install -e ".[all,dev]" --quiet; then
     success "All Python dependencies installed"
 else
@@ -174,18 +174,18 @@ fi
 # ── 7. Generate config file ─────────────────────────────────────────
 step "7/8  Generating config file"
 
-CONFIG_DIR="$HOME/.mediakit"
+CONFIG_DIR="$HOME/.readpile"
 CONFIG_FILE="$CONFIG_DIR/config.toml"
 
 if [ -f "$CONFIG_FILE" ]; then
     info "Config already exists at $CONFIG_FILE — skipping"
 else
-    info "Running 'mediakit init' to create default config..."
-    if mediakit init 2>/dev/null; then
+    info "Running 'readpile init' to create default config..."
+    if readpile init 2>/dev/null; then
         success "Config written to $CONFIG_FILE"
     else
         warn "Could not generate config automatically."
-        warn "Run 'mediakit init' manually after setup."
+        warn "Run 'readpile init' manually after setup."
         ERRORS=$((ERRORS + 1))
     fi
 fi

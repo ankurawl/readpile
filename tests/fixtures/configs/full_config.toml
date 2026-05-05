@@ -32,5 +32,5 @@ max_depth = 5
 max_pages = 50
 
 [bot]
-whitelist_file = "~/.mediakit/whitelist.json"
-preferences_file = "~/.mediakit/preferences.json"
+whitelist_file = "~/.readpile/whitelist.json"
+preferences_file = "~/.readpile/preferences.json"

@@ -1,11 +1,11 @@
-"""Tests for mediakit.bot.preferences — per-user configuration storage."""
+"""Tests for readpile.bot.preferences — per-user configuration storage."""
 
 import json
 import os
 
 import pytest
 
-from mediakit.bot.preferences import (
+from readpile.bot.preferences import (
     DEFAULT_PREFERENCES,
     VALID_PREF_KEYS,
     VALID_STYLES,

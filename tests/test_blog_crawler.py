@@ -1,4 +1,4 @@
-"""Tests for mediakit.crawlers.blog — blog post URL discovery."""
+"""Tests for readpile.crawlers.blog — blog post URL discovery."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 from urllib.parse import urlparse
@@ -10,12 +10,12 @@ class TestBlogCrawlerImport:
     def test_can_import_without_playwright(self):
         """BlogCrawler should be importable even without Playwright installed."""
         try:
-            from mediakit.crawlers.blog import BlogCrawler
+            from readpile.crawlers.blog import BlogCrawler
         except SystemExit:
             pytest.skip("Playwright not available")
 
     def test_check_deps_guard(self):
-        from mediakit.crawlers.blog import _check_deps
+        from readpile.crawlers.blog import _check_deps
         try:
             _check_deps()
         except SystemExit:
@@ -24,12 +24,12 @@ class TestBlogCrawlerImport:
 
 class TestBlogPostDetection:
     def test_detector_import(self):
-        from mediakit.crawlers.blog import BlogPostDetector
+        from readpile.crawlers.blog import BlogPostDetector
         detector = BlogPostDetector()
         assert detector is not None
 
     def test_url_patterns(self):
-        from mediakit.crawlers.blog import BlogPostDetector
+        from readpile.crawlers.blog import BlogPostDetector
         detector = BlogPostDetector()
         assert hasattr(detector, "detect")
 
@@ -37,7 +37,7 @@ class TestBlogPostDetection:
 class TestBlogCrawlerConfig:
     def test_constructor_params(self):
         try:
-            from mediakit.crawlers.blog import BlogCrawler
+            from readpile.crawlers.blog import BlogCrawler
         except SystemExit:
             pytest.skip("Deps not available")
 
@@ -55,7 +55,7 @@ class TestBlogCrawlerConfig:
 
     def test_default_max_posts_none(self):
         try:
-            from mediakit.crawlers.blog import BlogCrawler
+            from readpile.crawlers.blog import BlogCrawler
         except SystemExit:
             pytest.skip("Deps not available")
 
@@ -65,7 +65,7 @@ class TestBlogCrawlerConfig:
 
     def test_same_domain_filtering(self):
         try:
-            from mediakit.crawlers.blog import BlogCrawler
+            from readpile.crawlers.blog import BlogCrawler
         except SystemExit:
             pytest.skip("Deps not available")
 

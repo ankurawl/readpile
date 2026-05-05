@@ -1,16 +1,16 @@
-"""Tests for mediakit.scrapers.webpage — generic webpage scraper."""
+"""Tests for readpile.scrapers.webpage — generic webpage scraper."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from mediakit.core.models import ContentItem, ContentType
+from readpile.core.models import ContentItem, ContentType
 
 
 class TestWebpageScraper:
     @pytest.mark.asyncio
     async def test_returns_content_item(self):
-        from mediakit.scrapers.webpage import scrape_webpage
+        from readpile.scrapers.webpage import scrape_webpage
 
         page = AsyncMock()
         page.title.return_value = "Test Page Title"
@@ -18,7 +18,7 @@ class TestWebpageScraper:
         page.evaluate.return_value = "<p>This is the main content of the page with enough text.</p>"
         page.content.return_value = "<html><body><p>This is the main content of the page.</p></body></html>"
 
-        with patch("mediakit.scrapers.webpage.scrape_webpage") as mock_scrape:
+        with patch("readpile.scrapers.webpage.scrape_webpage") as mock_scrape:
             mock_scrape.return_value = ContentItem(
                 text="This is the main content of the page with enough text.",
                 title="Test Page Title",

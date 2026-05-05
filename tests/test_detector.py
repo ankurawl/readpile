@@ -1,6 +1,6 @@
-"""Tests for mediakit.core.detector — URL type detection and YouTube ID extraction."""
+"""Tests for readpile.core.detector — URL type detection and YouTube ID extraction."""
 
-from mediakit.core.detector import detect_url_type, URLType, extract_youtube_video_id
+from readpile.core.detector import detect_url_type, URLType, extract_youtube_video_id
 
 
 # --- YouTube ---

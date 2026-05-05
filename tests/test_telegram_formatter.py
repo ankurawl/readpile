@@ -1,8 +1,8 @@
-"""Tests for mediakit.bot.telegram_formatter — Telegram message formatting."""
+"""Tests for readpile.bot.telegram_formatter — Telegram message formatting."""
 
 import pytest
 
-from mediakit.bot.telegram_formatter import (
+from readpile.bot.telegram_formatter import (
     TELEGRAM_MSG_LIMIT,
     create_content_document,
     format_error_message,

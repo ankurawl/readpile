@@ -1,7 +1,7 @@
 {
   "mcpServers": {
-    "mediakit": {
-      "command": "mediakit-mcp",
+    "readpile": {
+      "command": "readpile-mcp",
       "args": [],
       "type": "stdio"
     }

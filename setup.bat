@@ -1,11 +1,11 @@
 @echo off
-REM setup.bat — mediakit installer for Windows
+REM setup.bat — readpile installer for Windows
 REM Usage: setup.bat
 setlocal enabledelayedexpansion
 
 echo.
 echo   +---------------------------------+
-echo   ^|       mediakit setup            ^|
+echo   ^|       readpile setup           ^|
 echo   ^|  Your personal media library    ^|
 echo   +---------------------------------+
 echo.
@@ -82,7 +82,7 @@ REM ── 3. Install Python dependencies ────────────�
 echo.
 echo [3/8] Installing Python dependencies...
 
-echo [INFO] Installing mediakit with all extras...
+echo [INFO] Installing readpile with all extras...
 pip install -e ".[all,dev]" --quiet
 if %ERRORLEVEL% equ 0 (
     echo [OK]   All Python dependencies installed
@@ -150,17 +150,17 @@ REM ── 7. Generate config file ───────────────
 echo.
 echo [7/8] Generating config file...
 
-set "CONFIG_FILE=%USERPROFILE%\.mediakit\config.toml"
+set "CONFIG_FILE=%USERPROFILE%\.readpile\config.toml"
 
 if exist "%CONFIG_FILE%" (
     echo [INFO] Config already exists at %CONFIG_FILE% -- skipping
 ) else (
-    echo [INFO] Running mediakit init...
-    mediakit init
+    echo [INFO] Running readpile init...
+    readpile init
     if %ERRORLEVEL% equ 0 (
         echo [OK]   Config written
     ) else (
-        echo [WARN] Could not generate config. Run 'mediakit init' manually.
+        echo [WARN] Could not generate config. Run 'readpile init' manually.
         set /a ERRORS+=1
     )
 )
