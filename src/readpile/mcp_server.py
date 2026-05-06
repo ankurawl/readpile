@@ -70,6 +70,13 @@ def _create_server():
                     "Try providing a direct YouTube or audio URL instead."
                 )
 
+            if url_type == URLType.youtube_channel:
+                return (
+                    "Error: This is a YouTube channel URL, not a single video. "
+                    "Use crawl(url, mode='youtube') to discover video URLs first, "
+                    "then transcribe individual videos."
+                )
+
             return (
                 f"Error: URL type '{url_type.value}' is not transcribable. "
                 "Supported types: youtube, audio_file, video, or a webpage with embedded media."
@@ -89,15 +96,18 @@ def _create_server():
 
         Args:
             url: URL to crawl.
-            mode: Crawl mode — "auto", "rss", "blog", "site", or "podcast".
-            recent: Only return N most recent items (RSS/podcast modes).
+            mode: Crawl mode — "auto", "rss", "blog", "site", "podcast", or "youtube".
+            recent: Only return N most recent items (RSS/podcast/youtube modes).
             limit: Max pages/posts to discover (blog/site modes).
-            metadata: When True (RSS/podcast modes only), return JSON metadata
+            metadata: When True (RSS/podcast/youtube modes only), return JSON metadata
                 per entry instead of bare URLs. Includes title, date, author,
                 description, audio_url, and duration. Ignored for blog/site modes.
 
         The "podcast" mode auto-discovers the podcast RSS feed from a URL,
         filters to audio-only entries, and always returns metadata.
+
+        The "youtube" mode resolves a YouTube channel URL (@handle, /channel/ID)
+        to its RSS feed and returns the most recent videos (up to 15).
 
         Returns a list of discovered URLs, or JSON metadata strings when
         metadata is enabled.
@@ -154,8 +164,26 @@ def _create_server():
                 return await _mcp_crawl_blog(resolved_url, max_pages=limit or 100)
             elif effective_mode == "site":
                 return await _mcp_crawl_site(resolved_url, max_pages=limit or 100)
+            elif effective_mode == "youtube":
+                feed_url = await _resolve_youtube_channel_feed(resolved_url)
+                if feed_url is None:
+                    return [
+                        f"Error: Could not resolve YouTube channel ID from {resolved_url}. "
+                        "Try providing the channel's RSS feed URL directly."
+                    ]
+                if recent is None:
+                    recent = 15
+                from readpile.crawlers.rss import crawl_rss_detailed
+                feed_info, entries = await asyncio.to_thread(
+                    crawl_rss_detailed, feed_url, recent
+                )
+                if use_metadata:
+                    result = [json.dumps(feed_info, ensure_ascii=False)]
+                    result.extend(json.dumps(e, ensure_ascii=False) for e in entries)
+                    return result
+                return [e["url"] for e in entries if e.get("url")]
             else:
-                return [f"Error: Unknown mode '{effective_mode}'. Use: auto, rss, blog, site, podcast."]
+                return [f"Error: Unknown mode '{effective_mode}'. Use: auto, rss, blog, site, podcast, youtube."]
         except SystemExit as e:
             return [str(e)]
 
@@ -440,6 +468,62 @@ async def _try_sitemap(client, sitemap_url: str) -> list[str]:
         return urls
     except Exception:
         return []
+
+
+async def _resolve_youtube_channel_feed(url: str) -> str | None:
+    """Resolve a YouTube channel URL to its RSS feed URL.
+
+    Fetches the channel page and extracts the channel ID from meta tags
+    or page source, then constructs the RSS feed URL.
+    """
+    import re
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
+            resp = await client.get(url, headers={"User-Agent": "readpile/0.1"})
+            resp.raise_for_status()
+            html = resp.text
+    except Exception:
+        return None
+
+    # Try <meta> tag: <meta itemprop="identifier" content="UCxxxxxx">
+    # or <meta property="og:url" content="https://www.youtube.com/channel/UCxxxxxx">
+    channel_id = None
+
+    match = re.search(r'"externalId"\s*:\s*"(UC[A-Za-z0-9_-]+)"', html)
+    if match:
+        channel_id = match.group(1)
+
+    if not channel_id:
+        match = re.search(r'"channelId"\s*:\s*"(UC[A-Za-z0-9_-]+)"', html)
+        if match:
+            channel_id = match.group(1)
+
+    if not channel_id:
+        match = re.search(
+            r'youtube\.com/channel/(UC[A-Za-z0-9_-]+)', html
+        )
+        if match:
+            channel_id = match.group(1)
+
+    if not channel_id:
+        # Try <link rel="canonical" href="...channel/UCxxx">
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, "lxml")
+        canonical = soup.find("link", rel="canonical")
+        if canonical and canonical.get("href"):
+            match = re.search(
+                r'youtube\.com/channel/(UC[A-Za-z0-9_-]+)',
+                canonical["href"],
+            )
+            if match:
+                channel_id = match.group(1)
+
+    if channel_id:
+        return f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+
+    return None
 
 
 async def _discover_podcast_feed(url: str) -> str | None:

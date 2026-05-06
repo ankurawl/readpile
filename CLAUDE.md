@@ -15,13 +15,21 @@ readpile exposes 6 tools via MCP (Model Context Protocol):
 
 ### crawl tool details
 
-Modes: `auto`, `rss`, `blog`, `site`, `podcast`
+Modes: `auto`, `rss`, `blog`, `site`, `podcast`, `youtube`
 
-- `metadata=True` (RSS/podcast modes): Returns JSON metadata per entry (title, date, author, description, audio_url, duration) instead of bare URLs
+- `metadata=True` (RSS/podcast/youtube modes): Returns JSON metadata per entry (title, date, author, description, audio_url, duration) instead of bare URLs
 - `mode="podcast"`: Auto-discovers the podcast RSS feed from any URL, filters to audio-only entries, always returns metadata
-- `recent=N`: Limit to N most recent entries (RSS/podcast modes)
+- `mode="youtube"`: Resolves YouTube channel URLs (@handle, /channel/ID) to their RSS feed, returns up to 15 most recent videos
+- `recent=N`: Limit to N most recent entries (RSS/podcast/youtube modes)
 
 ### Workflows
+
+**YouTube channel transcription:**
+```
+crawl(url, mode="youtube", recent=5)   → Video URLs/metadata from a YouTube channel (@handle)
+transcribe(video_url)                  → Full transcript using YouTube captions (no ffmpeg needed)
+archive(content, title, source_url)    → Save to disk (one call per item)
+```
 
 **Podcast discovery and summarization:**
 ```

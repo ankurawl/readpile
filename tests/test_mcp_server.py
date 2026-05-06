@@ -104,6 +104,26 @@ class TestCrawlModeDetection:
         from readpile.cli.crawl import _detect_crawl_mode
         assert _detect_crawl_mode("https://example.com/podcast/feed") == "rss"
 
+    def test_youtube_channel_handle(self):
+        from readpile.cli.crawl import _detect_crawl_mode
+        assert _detect_crawl_mode("https://www.youtube.com/@howiaipodcast") == "youtube"
+
+    def test_youtube_channel_id(self):
+        from readpile.cli.crawl import _detect_crawl_mode
+        assert _detect_crawl_mode("https://www.youtube.com/channel/UCxyz123") == "youtube"
+
+    def test_youtube_channel_with_subpath(self):
+        from readpile.cli.crawl import _detect_crawl_mode
+        assert _detect_crawl_mode("https://www.youtube.com/@handle/videos") == "youtube"
+
+    def test_youtube_watch_not_channel(self):
+        """YouTube watch URLs should NOT be detected as youtube channel mode."""
+        from readpile.cli.crawl import _detect_crawl_mode
+        # watch URLs don't match the channel pattern, so they fall through
+        # to the default "site" mode (the detector handles them separately)
+        result = _detect_crawl_mode("https://www.youtube.com/watch?v=abc123")
+        assert result != "youtube"
+
 
 class TestCrawlMetadata:
     @patch("readpile.crawlers.rss.feedparser.parse")

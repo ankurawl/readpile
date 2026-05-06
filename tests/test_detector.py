@@ -71,6 +71,34 @@ def test_video_loom():
     assert detect_url_type("https://www.loom.com/share/abc") == URLType.video
 
 
+# --- YouTube channel ---
+
+
+def test_youtube_channel_handle():
+    assert detect_url_type("https://www.youtube.com/@howiaipodcast") == URLType.youtube_channel
+
+
+def test_youtube_channel_id():
+    assert detect_url_type("https://www.youtube.com/channel/UCBcRF18a7Qf58cCRy5xuWwQ") == URLType.youtube_channel
+
+
+def test_youtube_channel_custom():
+    assert detect_url_type("https://www.youtube.com/c/Fireship") == URLType.youtube_channel
+
+
+def test_youtube_channel_user():
+    assert detect_url_type("https://www.youtube.com/user/someuser") == URLType.youtube_channel
+
+
+def test_youtube_channel_with_videos_subpath():
+    assert detect_url_type("https://www.youtube.com/@handle/videos") == URLType.youtube_channel
+
+
+def test_audio_in_feed_path():
+    """MP3 URLs with /feed/ in path should be audio, not RSS."""
+    assert detect_url_type("https://api.substack.com/feed/podcast/123/ep.mp3") == URLType.audio_file
+
+
 # --- Blog (default) ---
 
 

@@ -13,6 +13,7 @@ class URLType(Enum):
     """Supported source types for media processing."""
 
     youtube = "youtube"
+    youtube_channel = "youtube_channel"
     video = "video"
     rss = "rss"
     audio_file = "audio_file"
@@ -34,6 +35,10 @@ _VIDEO_EXTENSIONS = {".mp4", ".mkv", ".avi", ".mov", ".webm"}
 
 _YOUTUBE_RE = re.compile(
     r"(youtube\.com/(watch|shorts|live)|youtu\.be/|youtube\.com/playlist)"
+)
+
+_YOUTUBE_CHANNEL_RE = re.compile(
+    r"youtube\.com/(@[\w.-]+|channel/[\w-]+|c/[\w.-]+|user/[\w.-]+)(/|$)"
 )
 
 _YOUTUBE_ID_PATTERNS = [
@@ -90,6 +95,9 @@ def detect_url_type(source: str) -> URLType:
     # ------------------------------------------------------------------
     if _YOUTUBE_RE.search(source):
         return URLType.youtube
+
+    if _YOUTUBE_CHANNEL_RE.search(source):
+        return URLType.youtube_channel
 
     # ------------------------------------------------------------------
     # 3. Audio/Video URL (check before RSS path segments so that

@@ -28,10 +28,17 @@ _RSS_PATH_SEGMENTS = ("/feed", "/rss", "/atom")
 def _detect_crawl_mode(url: str) -> str:
     """Heuristically determine the crawl mode from a URL.
 
-    Returns one of ``"rss"``, ``"podcast"``, ``"blog"``, or ``"site"``.
+    Returns one of ``"rss"``, ``"podcast"``, ``"youtube"``, ``"blog"``,
+    or ``"site"``.
     """
     parsed = urlparse(url)
     path_lower = parsed.path.lower()
+
+    # YouTube channel URLs → dedicated youtube mode
+    if "youtube.com" in parsed.netloc.lower():
+        import re
+        if re.search(r'^/(@[\w.-]+|channel/[\w-]+|c/[\w.-]+|user/[\w.-]+)(/|$)', path_lower):
+            return "youtube"
 
     # RSS indicators: extension or path segment (checked first so
     # /podcast/feed → "rss" rather than "podcast")
@@ -196,6 +203,8 @@ def main(
         if effective_mode == "rss":
             urls = _crawl_rss(url, recent)
         elif effective_mode == "podcast":
+            urls = _crawl_rss(url, recent)
+        elif effective_mode == "youtube":
             urls = _crawl_rss(url, recent)
         elif effective_mode == "blog":
             urls = _crawl_blog(url, depth, max_pages, login)
