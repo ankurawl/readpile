@@ -61,10 +61,12 @@ async def _run(
     """Launch a browser, scrape every URL, and return the extracted items."""
     from playwright.async_api import async_playwright
 
+    from readpile.core.browser import launch_chromium
+
     items: list[ContentItem] = []
 
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=headless)
+        browser = await launch_chromium(pw, headless=headless)
         context = await browser.new_context()
         page = await context.new_page()
 

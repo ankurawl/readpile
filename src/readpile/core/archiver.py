@@ -69,6 +69,11 @@ def generate_filename(
         date_str = datetime.now(tz=timezone.utc).strftime(fmt)
 
     slug = sanitize_filename(item.title)
+
+    if item.author:
+        author_slug = sanitize_filename(item.author, max_length=30)
+        return f"{date_str}_{author_slug}_{slug}.md"
+
     return f"{date_str}_{slug}.md"
 
 

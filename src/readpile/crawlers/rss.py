@@ -118,3 +118,85 @@ def _has_audio_enclosure(entry: feedparser.FeedParserDict) -> bool:
         if href.endswith((".mp3", ".m4a", ".ogg", ".wav")):
             return True
     return False
+
+
+def _get_audio_enclosure_url(entry: feedparser.FeedParserDict) -> str | None:
+    """Return the URL of the first audio enclosure, or ``None``."""
+    for enc in entry.get("enclosures", []):
+        enc_type = enc.get("type", "")
+        href = enc.get("href", "")
+        if enc_type.startswith("audio/") or href.endswith(
+            (".mp3", ".m4a", ".ogg", ".wav")
+        ):
+            if href:
+                return href
+    return None
+
+
+def _strip_html(text: str) -> str:
+    """Remove HTML tags from *text*."""
+    import re
+    return re.sub(r"<[^>]+>", "", text).strip()
+
+
+def crawl_rss_detailed(
+    url: str,
+    recent: int | None = None,
+    audio_only: bool = False,
+) -> tuple[dict, list[dict]]:
+    """Parse an RSS/Atom feed and return structured metadata for each entry.
+
+    Returns ``(feed_info, entries)`` where *feed_info* contains feed-level
+    metadata and *entries* is a list of dicts with per-entry metadata.
+
+    When *audio_only* is ``True``, only entries with audio enclosures are
+    returned (useful for isolating podcast episodes from mixed feeds).
+    """
+    _check_deps()
+
+    feed = feedparser.parse(url)
+
+    if feed.bozo and not feed.entries:
+        logger.warning(f"Malformed or empty feed at {url}: {feed.bozo_exception}")
+        return {"feed_title": None, "feed_description": None, "episode_count": 0}, []
+
+    entries: list[tuple[datetime | None, dict]] = []
+    for entry in feed.entries:
+        is_audio = _has_audio_enclosure(entry)
+        if audio_only and not is_audio:
+            continue
+
+        audio_url = _get_audio_enclosure_url(entry) if is_audio else None
+        page_url = entry.get("link")
+
+        entry_date = _get_entry_date(entry)
+        date_str = entry_date.strftime("%Y-%m-%d") if entry_date else None
+
+        summary = entry.get("summary", "")
+        description = _strip_html(summary)[:300] if summary else None
+
+        meta = {
+            "title": entry.get("title", "Untitled"),
+            "url": page_url or audio_url,
+            "date": date_str,
+            "author": entry.get("author"),
+            "type": "audio" if is_audio else "article",
+            "audio_url": audio_url,
+            "duration": entry.get("itunes_duration"),
+            "description": description,
+        }
+        entries.append((entry_date, meta))
+
+    entries.sort(key=lambda pair: pair[0] or datetime.min, reverse=True)
+
+    result = [meta for _, meta in entries]
+    if recent is not None:
+        result = result[:recent]
+
+    feed_info = {
+        "feed_title": feed.feed.get("title"),
+        "feed_description": feed.feed.get("subtitle") or feed.feed.get("description"),
+        "episode_count": len(result),
+    }
+
+    return feed_info, result

@@ -110,7 +110,7 @@ step "4/8  Installing Playwright Chromium browser"
 
 if command -v playwright &>/dev/null || [ -f ".venv/bin/playwright" ]; then
     info "Installing Chromium for Playwright..."
-    if playwright install chromium; then
+    if python -m playwright install chromium; then
         success "Playwright Chromium installed"
     else
         warn "Playwright Chromium install failed (non-fatal)"
@@ -124,7 +124,7 @@ if command -v playwright &>/dev/null || [ -f ".venv/bin/playwright" ]; then
             success "Playwright system deps installed"
         else
             warn "Could not install Playwright system deps. You may need to run:"
-            warn "  sudo playwright install-deps chromium"
+            warn "  sudo python -m playwright install-deps chromium"
             ERRORS=$((ERRORS + 1))
         fi
     fi

@@ -68,10 +68,10 @@ def detect_url_type(source: str) -> URLType:
        - Video extensions → ``video``
        - Everything else  → ``local_file``
     2. **YouTube** — recognised YouTube URL patterns → ``youtube``
-    3. **RSS / Atom feed** — feed-like URL suffix or path → ``rss``
-    4. **Audio URL** — URL whose path ends with an audio extension → ``audio_file``
-    5. **Video URL** — Vimeo / Loom host, or path ends with video ext → ``video``
-    6. **Default** → ``blog`` (most URLs are articles; the scraper handles it)
+    3. **Audio/Video URL** — URL ending with audio/video extension,
+       or Vimeo/Loom host → ``audio_file`` / ``video``
+    4. **RSS / Atom feed** — feed-like URL suffix or path → ``rss``
+    5. **Default** → ``blog`` (most URLs are articles; the scraper handles it)
     """
 
     # ------------------------------------------------------------------
@@ -92,11 +92,25 @@ def detect_url_type(source: str) -> URLType:
         return URLType.youtube
 
     # ------------------------------------------------------------------
-    # 3. RSS / Atom feed
+    # 3. Audio/Video URL (check before RSS path segments so that
+    #    URLs like /feed/podcast/episode.mp3 are detected as audio)
     # ------------------------------------------------------------------
     parsed = urlparse(source)
     path_lower = parsed.path.lower()
+    url_ext = os.path.splitext(path_lower)[1]
 
+    if url_ext in _AUDIO_EXTENSIONS:
+        return URLType.audio_file
+
+    if _VIDEO_HOST_RE.search(parsed.netloc):
+        return URLType.video
+
+    if url_ext in _VIDEO_EXTENSIONS:
+        return URLType.video
+
+    # ------------------------------------------------------------------
+    # 4. RSS / Atom feed
+    # ------------------------------------------------------------------
     if os.path.splitext(path_lower)[1] in _RSS_EXTENSIONS:
         return URLType.rss
 
@@ -105,23 +119,7 @@ def detect_url_type(source: str) -> URLType:
             return URLType.rss
 
     # ------------------------------------------------------------------
-    # 4. Audio URL
-    # ------------------------------------------------------------------
-    url_ext = os.path.splitext(path_lower)[1]
-    if url_ext in _AUDIO_EXTENSIONS:
-        return URLType.audio_file
-
-    # ------------------------------------------------------------------
-    # 5. Video URL (Vimeo, Loom, or video extension)
-    # ------------------------------------------------------------------
-    if _VIDEO_HOST_RE.search(parsed.netloc):
-        return URLType.video
-
-    if url_ext in _VIDEO_EXTENSIONS:
-        return URLType.video
-
-    # ------------------------------------------------------------------
-    # 6. Default → blog
+    # 5. Default → blog
     # ------------------------------------------------------------------
     return URLType.blog
 

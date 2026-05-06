@@ -28,18 +28,24 @@ _RSS_PATH_SEGMENTS = ("/feed", "/rss", "/atom")
 def _detect_crawl_mode(url: str) -> str:
     """Heuristically determine the crawl mode from a URL.
 
-    Returns one of ``"rss"``, ``"blog"``, or ``"site"``.
+    Returns one of ``"rss"``, ``"podcast"``, ``"blog"``, or ``"site"``.
     """
     parsed = urlparse(url)
     path_lower = parsed.path.lower()
 
-    # RSS indicators: extension or path segment
+    # RSS indicators: extension or path segment (checked first so
+    # /podcast/feed → "rss" rather than "podcast")
     for ext in _RSS_EXTENSIONS:
         if path_lower.endswith(ext):
             return "rss"
     for seg in _RSS_PATH_SEGMENTS:
         if seg in path_lower:
             return "rss"
+
+    # Podcast: exact /podcast path segment
+    segments = [s for s in path_lower.split("/") if s]
+    if "podcast" in segments:
+        return "podcast"
 
     # Blog heuristics: path contains /blog or common blog patterns
     if "/blog" in path_lower:
@@ -69,11 +75,13 @@ def _crawl_blog(url: str, max_depth: int, max_pages: int, login: bool) -> list[s
     async def _run() -> list[str]:
         from playwright.async_api import async_playwright
 
+        from readpile.core.browser import launch_chromium
+
         async with async_playwright() as pw:
             launch_kwargs: dict = {"headless": not login}
             if login:
                 launch_kwargs["channel"] = "chrome"
-            browser = await pw.chromium.launch(**launch_kwargs)
+            browser = await launch_chromium(pw, **launch_kwargs)
 
             context_kwargs: dict = {}
             if login:
@@ -186,6 +194,8 @@ def main(
 
     try:
         if effective_mode == "rss":
+            urls = _crawl_rss(url, recent)
+        elif effective_mode == "podcast":
             urls = _crawl_rss(url, recent)
         elif effective_mode == "blog":
             urls = _crawl_blog(url, depth, max_pages, login)

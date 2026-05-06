@@ -55,11 +55,14 @@ class SiteCrawler:
         site_prefix = self._derive_site_prefix(self.base_url, self.scope)
         logger.info(f"Crawling {self.base_url} (prefix={site_prefix}, depth={self.max_depth})")
 
+        from readpile.core.browser import launch_chromium, launch_persistent_chromium
+
         async with async_playwright() as p:
             if not self.headless:
                 profile_dir = Path.home() / ".readpile" / "browser_profile"
                 profile_dir.mkdir(parents=True, exist_ok=True)
-                context = await p.chromium.launch_persistent_context(
+                context = await launch_persistent_chromium(
+                    p,
                     user_data_dir=str(profile_dir),
                     headless=False,
                     viewport={"width": 1280, "height": 900},
@@ -69,7 +72,7 @@ class SiteCrawler:
                 page = context.pages[0] if context.pages else await context.new_page()
                 browser = None
             else:
-                browser = await p.chromium.launch(headless=True)
+                browser = await launch_chromium(p, headless=True)
                 context = await browser.new_context(
                     viewport={"width": 1280, "height": 900}
                 )

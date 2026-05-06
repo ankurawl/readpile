@@ -97,7 +97,7 @@ echo [4/8] Installing Playwright Chromium browser...
 
 where playwright >nul 2>&1
 if %ERRORLEVEL% equ 0 (
-    playwright install chromium
+    python -m playwright install chromium
     if %ERRORLEVEL% equ 0 (
         echo [OK]   Playwright Chromium installed
     ) else (

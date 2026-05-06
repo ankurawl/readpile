@@ -71,7 +71,7 @@ The full article text in clean Markdown...
 
 ```bash
 pip install readpile
-playwright install chromium    # needed for web scraping
+python -m playwright install chromium    # needed for web scraping
 ```
 
 ### Use from the command line
@@ -102,6 +102,7 @@ readpile ships as an [MCP server](https://modelcontextprotocol.io/) that any com
 
 ```bash
 pip install readpile[mcp]
+python -m playwright install chromium
 # Claude Code discovers the server automatically
 ```
 
@@ -335,14 +336,14 @@ git clone https://github.com/ankurawl/readpile.git
 cd readpile
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,all]"
-playwright install chromium
+python -m playwright install chromium
 ```
 
 ### System dependencies
 
 | Dependency | Required for | Install |
 |------------|-------------|---------|
-| Chromium | Web scraping | `playwright install chromium` (auto-managed) |
+| Chromium | Web scraping | `python -m playwright install chromium` (auto-managed) |
 | ffmpeg | Audio transcription | `brew install ffmpeg` / `apt install ffmpeg` |
 
 ---
