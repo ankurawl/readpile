@@ -4,7 +4,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)]()
-[![Tests](https://img.shields.io/badge/tests-157%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-217%20passing-brightgreen.svg)]()
 
 ---
 
@@ -28,10 +28,12 @@ The best content on the web is scattered across blogs, YouTube channels, podcast
 |--------|-------------|
 | **Blog posts & articles** | Clean Markdown with title, author, date, tags — extracted from the rendered page |
 | **YouTube videos** | Full transcript with timestamps, via YouTube's caption API (instant, free) |
+| **YouTube channels** | Discover recent videos from any channel (`@handle`, `/channel/ID`) via RSS |
+| **Podcasts** | Auto-discover podcast RSS feeds, get episode metadata, transcribe episodes |
 | **Audio & video files** | Whisper-powered transcription with optional speaker diarization |
-| **RSS/Atom feeds** | All entry URLs, ready to pipe into scrape or transcribe |
+| **RSS/Atom feeds** | All entry URLs with optional metadata (title, date, description, audio URLs) |
 | **Documentation sites** | Recursive crawl that discovers every page under a URL prefix |
-| **Any webpage** | Headless Chromium rendering + intelligent content extraction |
+| **Any webpage** | Headless Chromium rendering + intelligent content extraction (HTTP fallback when Chromium unavailable) |
 
 ### How it fits together
 
@@ -126,9 +128,21 @@ Available MCP tools:
 |----------|-------------|
 | `scrape(url)` | Extract article/webpage content as Markdown |
 | `transcribe(source, language)` | Transcribe YouTube or audio/video URLs |
-| `crawl(url, mode, recent, limit)` | Discover content URLs from feeds, blogs, or sites |
-| `archive(content, title, source_url)` | Save content to disk as a Markdown file |
-| `detect_type(url)` | Identify URL type (youtube, rss, blog, audio, etc.) |
+| `crawl(url, mode, recent, limit, metadata)` | Discover content URLs from feeds, blogs, sites, YouTube channels, or podcasts |
+| `batch_scrape(urls, concurrency)` | Scrape multiple URLs in one call with concurrency control |
+| `archive(content, title, source_url, date, author, dir)` | Save content to disk as a Markdown file |
+| `detect_type(url)` | Identify URL type (youtube, youtube_channel, rss, blog, audio, etc.) |
+
+The `crawl` tool supports these modes:
+
+| Mode | What it does |
+|------|-------------|
+| `auto` | Auto-detect the best mode from the URL |
+| `rss` | Parse RSS/Atom feeds. Use `metadata=True` to get JSON with titles, dates, descriptions |
+| `podcast` | Auto-discover podcast RSS feed from any URL, filter to audio-only episodes |
+| `youtube` | Resolve YouTube channel URLs to their RSS feed, return recent videos |
+| `blog` | Discover blog post URLs via Playwright or HTTP fallback |
+| `site` | Recursive site crawl under a URL prefix |
 
 ---
 
@@ -167,6 +181,26 @@ transcribe https://youtube.com/watch?v=related-talk | archive --dir ./research/
 ```bash
 crawl https://podcast.com/feed.xml --recent 5
 # Returns 5 episode URLs — pipe to transcribe, then read at your own pace
+```
+
+### Catch up on a YouTube channel
+
+Using MCP, your LLM can discover and transcribe recent videos from any YouTube channel:
+
+```
+crawl("youtube.com/@channelname", recent=5)  → 5 most recent video URLs
+transcribe(video_url)                        → full transcript via YouTube captions
+archive(content, title, source_url)          → save to your library
+```
+
+### Discover and summarize a podcast
+
+Using MCP, your LLM can find podcast episodes and get structured metadata in one call:
+
+```
+crawl("newsletter.com/podcast", mode="podcast", recent=10)
+  → auto-discovers RSS feed, filters to audio episodes
+  → returns JSON with title, date, description, audio URL, duration per episode
 ```
 
 ### Collect from behind a login wall
@@ -217,7 +251,7 @@ transcribe interview.wav --language es --diarize
 
 ### `crawl` — Discover content URLs
 
-Finds URLs from RSS/Atom feeds, blogs (via Playwright), or full site crawls. Outputs one URL per line.
+Finds URLs from RSS/Atom feeds, blogs (via Playwright), YouTube channels, or full site crawls. Outputs one URL per line.
 
 ```bash
 crawl https://example.com/blog                       # auto-detect mode
@@ -225,6 +259,8 @@ crawl https://example.com/feed.xml --recent 5        # RSS, 5 most recent
 crawl https://docs.example.com --mode site --depth 3 # recursive site crawl
 crawl https://members.example.com --mode blog --login # auth via persistent browser
 ```
+
+Modes: `auto`, `rss`, `blog`, `site`, `podcast`, `youtube`. The `podcast` and `youtube` modes are most powerful via MCP, where they auto-discover feeds and return structured metadata.
 
 ### `archive` — Save to disk
 
@@ -366,7 +402,7 @@ src/readpile/
 ## Running Tests
 
 ```bash
-pytest tests/ -v                                           # full suite (157 tests)
+pytest tests/ -v                                           # full suite (217 tests)
 pytest tests/ -m "not slow and not network and not audio"  # fast tests only
 ```
 
