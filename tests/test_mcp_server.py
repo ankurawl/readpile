@@ -514,3 +514,322 @@ class TestBatchScrape:
             assert "Connection refused" in result
 
         asyncio.run(_run())
+
+
+class TestDiscoverFeed:
+    def test_rss_url_returned_directly(self):
+        """If URL is already RSS, return it without fetching."""
+        import asyncio
+        from readpile.mcp_server import _discover_feed
+
+        result = asyncio.run(
+            _discover_feed("https://example.com/feed.xml")
+        )
+        assert result == "https://example.com/feed.xml"
+
+    @patch("readpile.crawlers.rss.feedparser.parse")
+    def test_link_tag_discovery(self, mock_parse):
+        """Discovers feed from <link rel="alternate"> tag."""
+        import asyncio
+
+        mock_feed = MagicMock()
+        mock_feed.bozo = False
+        mock_feed.entries = [MagicMock()]
+        mock_parse.return_value = mock_feed
+
+        html = """
+        <html><head>
+        <link rel="alternate" type="application/rss+xml"
+              title="Blog Feed" href="/feed">
+        </head><body></body></html>
+        """
+
+        async def _run():
+            with patch("httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_resp = MagicMock()
+                mock_resp.status_code = 200
+                mock_resp.text = html
+                mock_resp.raise_for_status = MagicMock()
+                mock_client.get = AsyncMock(return_value=mock_resp)
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=False)
+                mock_client_cls.return_value = mock_client
+
+                from readpile.mcp_server import _discover_feed
+                result = await _discover_feed("https://example.com/blog")
+                assert result == "https://example.com/feed"
+
+        asyncio.run(_run())
+
+    @patch("readpile.crawlers.rss.feedparser.parse")
+    def test_atom_link_discovery(self, mock_parse):
+        """Discovers Atom feed from <link rel="alternate"> tag."""
+        import asyncio
+
+        mock_feed = MagicMock()
+        mock_feed.bozo = False
+        mock_feed.entries = [MagicMock()]
+        mock_parse.return_value = mock_feed
+
+        html = """
+        <html><head>
+        <link rel="alternate" type="application/atom+xml"
+              title="Atom Feed" href="/atom.xml">
+        </head><body></body></html>
+        """
+
+        async def _run():
+            with patch("httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_resp = MagicMock()
+                mock_resp.status_code = 200
+                mock_resp.text = html
+                mock_resp.raise_for_status = MagicMock()
+                mock_client.get = AsyncMock(return_value=mock_resp)
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=False)
+                mock_client_cls.return_value = mock_client
+
+                from readpile.mcp_server import _discover_feed
+                result = await _discover_feed("https://example.com/blog")
+                assert result == "https://example.com/atom.xml"
+
+        asyncio.run(_run())
+
+    @patch("readpile.crawlers.rss.feedparser.parse")
+    def test_fallback_pattern_discovery(self, mock_parse):
+        """Falls back to {base}/feed when no <link> tags."""
+        import asyncio
+
+        mock_feed = MagicMock()
+        mock_feed.bozo = False
+        mock_feed.entries = [MagicMock()]
+        mock_parse.return_value = mock_feed
+
+        html = "<html><head></head><body>No feed links</body></html>"
+
+        async def _run():
+            with patch("httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_resp = MagicMock()
+                mock_resp.status_code = 200
+                mock_resp.text = html
+                mock_resp.raise_for_status = MagicMock()
+                mock_client.get = AsyncMock(return_value=mock_resp)
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=False)
+                mock_client_cls.return_value = mock_client
+
+                from readpile.mcp_server import _discover_feed
+                result = await _discover_feed("https://example.com/blog")
+                assert result == "https://example.com/feed"
+
+        asyncio.run(_run())
+
+    @patch("readpile.crawlers.rss.feedparser.parse")
+    def test_prefer_keywords(self, mock_parse):
+        """With prefer_keywords, matching <link> titles are tried first."""
+        import asyncio
+
+        call_order = []
+
+        def _parse_side_effect(url):
+            call_order.append(url)
+            mock_feed = MagicMock()
+            mock_feed.bozo = False
+            mock_feed.entries = [MagicMock()]
+            return mock_feed
+
+        mock_parse.side_effect = _parse_side_effect
+
+        html = """
+        <html><head>
+        <link rel="alternate" type="application/rss+xml"
+              title="Blog Feed" href="/blog-feed">
+        <link rel="alternate" type="application/rss+xml"
+              title="Podcast Audio Feed" href="/podcast-feed">
+        </head><body></body></html>
+        """
+
+        async def _run():
+            with patch("httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_resp = MagicMock()
+                mock_resp.status_code = 200
+                mock_resp.text = html
+                mock_resp.raise_for_status = MagicMock()
+                mock_client.get = AsyncMock(return_value=mock_resp)
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=False)
+                mock_client_cls.return_value = mock_client
+
+                from readpile.mcp_server import _discover_feed
+                result = await _discover_feed(
+                    "https://example.com/podcast",
+                    prefer_keywords=["podcast", "audio"],
+                )
+                assert result == "https://example.com/podcast-feed"
+                assert call_order[0] == "https://example.com/podcast-feed"
+
+        asyncio.run(_run())
+
+
+class TestCrawlRssDiscovery:
+    @patch("readpile.mcp_server._discover_feed", new_callable=AsyncMock)
+    @patch("readpile.crawlers.rss.feedparser.parse")
+    def test_rss_mode_discovers_feed_for_non_feed_url(
+        self, mock_parse, mock_discover
+    ):
+        """crawl with mode=rss discovers feed when URL is not a feed."""
+        import asyncio
+
+        mock_discover.return_value = "https://blog.example.com/feed"
+
+        mock_feed = MagicMock()
+        mock_feed.bozo = False
+        mock_feed.feed = MagicMock()
+        mock_feed.feed.get = {"title": "Blog"}.get
+        entry = MagicMock()
+        entry.get = {
+            "title": "Post 1",
+            "link": "https://blog.example.com/post-1",
+            "published_parsed": (2026, 4, 25, 0, 0, 0, 0, 0, 0),
+        }.get
+        mock_feed.entries = [entry]
+        mock_parse.return_value = mock_feed
+
+        async def _run():
+            from readpile.mcp_server import _create_server
+
+            server = _create_server()
+            tools = server._tool_manager._tools
+            crawl_fn = tools["crawl"].fn
+            result = await crawl_fn(
+                url="https://blog.example.com",
+                mode="rss",
+                recent=None,
+                limit=None,
+                metadata=False,
+            )
+            assert "https://blog.example.com/post-1" in result
+            mock_discover.assert_called_once()
+
+        asyncio.run(_run())
+
+    @patch("readpile.crawlers.rss.feedparser.parse")
+    def test_rss_mode_skips_discovery_for_feed_url(self, mock_parse):
+        """crawl with mode=rss skips discovery when URL looks like a feed."""
+        import asyncio
+
+        mock_feed = MagicMock()
+        mock_feed.bozo = False
+        mock_feed.feed = MagicMock()
+        mock_feed.feed.get = {"title": "Blog"}.get
+        entry = MagicMock()
+        entry.get = {
+            "title": "Post 1",
+            "link": "https://blog.example.com/post-1",
+            "published_parsed": (2026, 4, 25, 0, 0, 0, 0, 0, 0),
+        }.get
+        mock_feed.entries = [entry]
+        mock_parse.return_value = mock_feed
+
+        async def _run():
+            from readpile.mcp_server import _create_server
+
+            server = _create_server()
+            tools = server._tool_manager._tools
+            crawl_fn = tools["crawl"].fn
+
+            with patch(
+                "readpile.mcp_server._discover_feed", new_callable=AsyncMock
+            ) as mock_discover:
+                result = await crawl_fn(
+                    url="https://blog.example.com/feed.xml",
+                    mode="rss",
+                    recent=None,
+                    limit=None,
+                    metadata=False,
+                )
+                assert "https://blog.example.com/post-1" in result
+                mock_discover.assert_not_called()
+
+        asyncio.run(_run())
+
+
+class TestBatchScrapeArchive:
+    @patch("readpile.scrapers.scrape_url")
+    def test_archive_dir_saves_files(self, mock_scrape):
+        """batch_scrape with archive_dir saves scraped articles to disk."""
+        import asyncio
+        import os
+        import tempfile
+        from readpile.core.models import ContentItem, ContentType
+
+        success_item = ContentItem(
+            text="Article content here",
+            title="Good Article",
+            source_url="https://good.com/article",
+            content_type=ContentType.article,
+        )
+
+        async def _scrape_side_effect(url):
+            if "good" in url:
+                return success_item
+            raise Exception("Connection refused")
+
+        mock_scrape.side_effect = _scrape_side_effect
+
+        async def _run():
+            from readpile.mcp_server import _create_server
+            server = _create_server()
+            tools = server._tool_manager._tools
+            batch_fn = tools["batch_scrape"].fn
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                result = await batch_fn(
+                    urls=["https://good.com/article", "https://bad.com/broken"],
+                    concurrency=3,
+                    archive_dir=tmpdir,
+                )
+                assert "Good Article" in result
+                assert "---ARCHIVED---" in result
+                assert "Saved:" in result
+                files = os.listdir(tmpdir)
+                assert len(files) == 1
+                assert files[0].endswith(".md")
+
+        asyncio.run(_run())
+
+    @patch("readpile.scrapers.scrape_url")
+    def test_no_archive_without_dir(self, mock_scrape):
+        """batch_scrape without archive_dir does not archive."""
+        import asyncio
+        from readpile.core.models import ContentItem, ContentType
+
+        item = ContentItem(
+            text="Content",
+            title="Article",
+            source_url="https://example.com/post",
+            content_type=ContentType.article,
+        )
+
+        async def _scrape_side_effect(url):
+            return item
+
+        mock_scrape.side_effect = _scrape_side_effect
+
+        async def _run():
+            from readpile.mcp_server import _create_server
+            server = _create_server()
+            tools = server._tool_manager._tools
+            batch_fn = tools["batch_scrape"].fn
+            result = await batch_fn(
+                urls=["https://example.com/post"],
+                concurrency=3,
+            )
+            assert "Article" in result
+            assert "---ARCHIVED---" not in result
+
+        asyncio.run(_run())

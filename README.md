@@ -4,7 +4,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)]()
-[![Tests](https://img.shields.io/badge/tests-225%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-234%20passing-brightgreen.svg)]()
 
 ---
 
@@ -129,7 +129,7 @@ Available MCP tools:
 | `scrape(url)` | Extract article/webpage content as Markdown |
 | `transcribe(source, language, fallback_url)` | Transcribe YouTube, audio/video URLs, or webpages with embedded YouTube. Use `fallback_url` for podcast episodes where audio needs ffmpeg but the webpage has a YouTube embed |
 | `crawl(url, mode, recent, limit, metadata)` | Discover content URLs from feeds, blogs, sites, YouTube channels, or podcasts |
-| `batch_scrape(urls, concurrency)` | Scrape multiple URLs in one call with concurrency control |
+| `batch_scrape(urls, concurrency, archive_dir)` | Scrape multiple URLs in one call with concurrency control. Use `archive_dir` to save all results to disk |
 | `archive(content, title, source_url, date, author, dir)` | Save content to disk as a Markdown file |
 | `detect_type(url)` | Identify URL type (youtube, youtube_channel, rss, blog, audio, etc.) |
 
@@ -138,7 +138,7 @@ The `crawl` tool supports these modes:
 | Mode | What it does |
 |------|-------------|
 | `auto` | Auto-detect the best mode from the URL |
-| `rss` | Parse RSS/Atom feeds. Use `metadata=True` to get JSON with titles, dates, descriptions |
+| `rss` | Parse RSS/Atom feeds. Auto-discovers feeds from non-feed URLs. Use `metadata=True` to get JSON with titles, dates, descriptions |
 | `podcast` | Auto-discover podcast RSS feed from any URL, filter to audio-only episodes |
 | `youtube` | Resolve YouTube channel URLs to their RSS feed, return recent videos |
 | `blog` | Discover blog post URLs via Playwright or HTTP fallback |
@@ -210,6 +210,19 @@ transcribe(audio_url, fallback_url=episode_url)
     webpage for an embedded YouTube video and transcribes that instead
 ```
 
+### Bulk-scrape and archive a blog
+
+Using MCP, your LLM can discover, scrape, and save an entire blog in two calls:
+
+```
+crawl("blog.example.com", mode="rss", metadata=True)
+  → auto-discovers RSS feed even from the homepage
+  → returns JSON metadata with title, date, author per post
+
+batch_scrape(selected_urls, archive_dir="/path/to/library")
+  → scrapes all articles and saves each as a Markdown file in one step
+```
+
 ### Collect from behind a login wall
 
 ```bash
@@ -267,7 +280,7 @@ crawl https://docs.example.com --mode site --depth 3 # recursive site crawl
 crawl https://members.example.com --mode blog --login # auth via persistent browser
 ```
 
-Modes: `auto`, `rss`, `blog`, `site`, `podcast`, `youtube`. The `podcast` and `youtube` modes are most powerful via MCP, where they auto-discover feeds and return structured metadata.
+Modes: `auto`, `rss`, `blog`, `site`, `podcast`, `youtube`. Via MCP, `rss` auto-discovers feeds from non-feed URLs, `podcast` and `youtube` auto-discover feeds and return structured metadata. Blog mode returns URLs in alphabetical order; use `rss` mode for date-sorted results.
 
 ### `archive` — Save to disk
 
@@ -409,7 +422,7 @@ src/readpile/
 ## Running Tests
 
 ```bash
-pytest tests/ -v                                           # full suite (217 tests)
+pytest tests/ -v                                           # full suite (234 tests)
 pytest tests/ -m "not slow and not network and not audio"  # fast tests only
 ```
 

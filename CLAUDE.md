@@ -8,8 +8,8 @@ readpile exposes 6 tools via MCP (Model Context Protocol):
 
 - **scrape** — Extract article/webpage content from a URL (YAML front matter + markdown)
 - **transcribe** — Transcribe YouTube videos, audio/video URLs, or webpages with embedded YouTube players
-- **crawl** — Discover content URLs from RSS feeds, blogs, sites, or podcasts
-- **batch_scrape** — Scrape multiple URLs in one call with concurrency control
+- **crawl** — Discover content URLs from RSS feeds, blogs, sites, or podcasts. Auto-discovers RSS feeds from non-feed URLs (e.g., `crawl("blog.com", mode="rss")` finds the feed automatically)
+- **batch_scrape** — Scrape multiple URLs in one call with concurrency control. Use `archive_dir` to save all results to disk in one step
 - **archive** — Save content to disk as markdown files
 - **detect_type** — Identify URL type (youtube, rss, blog, audio, video, etc.)
 
@@ -20,6 +20,8 @@ Modes: `auto`, `rss`, `blog`, `site`, `podcast`, `youtube`
 - `metadata=True` (RSS/podcast/youtube modes): Returns JSON metadata per entry (title, date, author, description, audio_url, duration) instead of bare URLs
 - `mode="podcast"`: Auto-discovers the podcast RSS feed from any URL, filters to audio-only entries, always returns metadata
 - `mode="youtube"`: Resolves YouTube channel URLs (@handle, /channel/ID) to their RSS feed, returns up to 15 most recent videos
+- `mode="rss"`: Parses RSS/Atom feeds. Auto-discovers feeds from non-feed URLs (checks `<link rel="alternate">` tags, then tries `/feed`, `/feed.xml`, `/rss`)
+- `mode="blog"`: Discovers blog post URLs via Playwright or HTTP fallback. Returns URLs in alphabetical order (not chronological). For date-sorted results, use `mode="rss"` instead
 - `recent=N`: Limit to N most recent entries (RSS/podcast/youtube modes)
 
 ### Workflows
@@ -42,9 +44,10 @@ archive(content, title, source_url)    → Save to disk (one call per item)
 
 **Blog bulk-read:**
 ```
-crawl(url, mode="rss", metadata=True)  → JSON metadata for all entries
-batch_scrape(selected_urls)            → Full content of multiple articles in one call
-archive(content, title, source_url)    → Save to disk (one call per item)
+crawl(url, mode="rss", metadata=True)  → JSON metadata for all entries (auto-discovers feed if needed)
+batch_scrape(selected_urls,            → Full content of multiple articles in one call
+  archive_dir="/path/to/library")        + automatically saved to disk
+archive(content, title, source_url)    → Or save to disk individually (one call per item)
 ```
 
 ### Setup

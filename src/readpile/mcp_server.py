@@ -163,13 +163,20 @@ def _create_server():
             if use_metadata and recent is None:
                 recent = 50
 
-            if effective_mode == "rss" and not use_metadata:
-                return await asyncio.to_thread(_crawl_rss, resolved_url, recent)
+            if effective_mode == "rss":
+                from readpile.core.detector import detect_url_type, URLType
+                feed_url = resolved_url
+                if detect_url_type(resolved_url) != URLType.rss:
+                    discovered = await _discover_feed(resolved_url)
+                    if discovered:
+                        feed_url = discovered
 
-            if effective_mode == "rss" and use_metadata:
+                if not use_metadata:
+                    return await asyncio.to_thread(_crawl_rss, feed_url, recent)
+
                 from readpile.crawlers.rss import crawl_rss_detailed
                 feed_info, entries = await asyncio.to_thread(
-                    crawl_rss_detailed, resolved_url, recent
+                    crawl_rss_detailed, feed_url, recent
                 )
                 result = [json.dumps(feed_info, ensure_ascii=False)]
                 result.extend(json.dumps(e, ensure_ascii=False) for e in entries)
@@ -301,15 +308,23 @@ def _create_server():
             return str(e)
 
     @mcp.tool()
-    async def batch_scrape(urls: list[str], concurrency: int = 3) -> str:
+    async def batch_scrape(
+        urls: list[str],
+        concurrency: int = 3,
+        archive_dir: str | None = None,
+    ) -> str:
         """Scrape multiple URLs in one call with concurrency control.
 
         Args:
             urls: List of URLs to scrape.
             concurrency: Max concurrent scrapes (default 3).
+            archive_dir: Optional directory to save scraped content. Each
+                successfully scraped article is automatically archived as a
+                Markdown file, avoiding the need to call archive() per item.
 
         Returns all scraped content concatenated with ---CONTENT_ITEM---
-        delimiters. Failed URLs are included as error items.
+        delimiters. Failed URLs are included as error items. When archive_dir
+        is set, saved file paths are appended after the content.
         """
         if not urls:
             return "No URLs provided."
@@ -334,7 +349,25 @@ def _create_server():
                     )
 
         items = await asyncio.gather(*[_scrape_one(u) for u in urls])
-        return ContentItem.to_batch(list(items))
+        result = ContentItem.to_batch(list(items))
+
+        if archive_dir:
+            from pathlib import Path
+            from readpile.core.archiver import Archiver
+
+            archiver = Archiver(Path(archive_dir).expanduser())
+            saved: list[str] = []
+            for item in items:
+                if not item.title.startswith("Failed:"):
+                    try:
+                        path = archiver.save(item)
+                        saved.append(f"Saved: {path}")
+                    except Exception as exc:
+                        saved.append(f"Error saving {item.source_url}: {exc}")
+            if saved:
+                result += "\n\n---ARCHIVED---\n" + "\n".join(saved)
+
+        return result
 
     return mcp
 
@@ -561,11 +594,17 @@ async def _resolve_youtube_channel_feed(url: str) -> str | None:
     return None
 
 
-async def _discover_podcast_feed(url: str) -> str | None:
-    """Discover a podcast RSS feed URL from a website URL.
+async def _discover_feed(
+    url: str, prefer_keywords: list[str] | None = None,
+) -> str | None:
+    """Discover an RSS/Atom feed URL from a website URL.
 
     Checks ``<link rel="alternate">`` tags first, then tries common feed
     URL patterns.  Returns the first valid feed URL or ``None``.
+
+    When *prefer_keywords* is set, ``<link>`` tags whose ``title`` attribute
+    contains one of those keywords are tried first (useful for isolating
+    podcast feeds from sites that expose multiple feeds).
     """
     import asyncio
     from urllib.parse import urlparse
@@ -589,28 +628,44 @@ async def _discover_podcast_feed(url: str) -> str | None:
     parsed = urlparse(url)
     base = f"{parsed.scheme}://{parsed.netloc}"
 
-    # Look for <link rel="alternate" type="application/rss+xml"> tags
     candidates: list[str] = []
     if html:
         soup = BeautifulSoup(html, "lxml")
-        links = soup.find_all("link", rel="alternate", type="application/rss+xml")
-        # Prefer links whose title mentions podcast/audio
-        podcast_links = [
-            lnk for lnk in links
-            if lnk.get("title") and any(
-                kw in lnk["title"].lower() for kw in ("podcast", "audio")
-            )
-        ]
-        preferred = podcast_links or links
-        for lnk in preferred:
+        rss_links = soup.find_all(
+            "link", rel="alternate", type="application/rss+xml",
+        )
+        atom_links = soup.find_all(
+            "link", rel="alternate", type="application/atom+xml",
+        )
+        all_links = rss_links + atom_links
+
+        if prefer_keywords:
+            preferred = [
+                lnk for lnk in all_links
+                if lnk.get("title") and any(
+                    kw in lnk["title"].lower() for kw in prefer_keywords
+                )
+            ]
+            ordered = preferred + [l for l in all_links if l not in preferred]
+        else:
+            ordered = all_links
+
+        for lnk in ordered:
             href = lnk.get("href")
             if href:
                 if href.startswith("/"):
                     href = base + href
-                candidates.append(href)
+                if href not in candidates:
+                    candidates.append(href)
 
     # Fallback: common patterns
-    for pattern in [f"{base}/feed", f"{base}/podcast/feed", f"{base}/rss"]:
+    patterns = [
+        f"{base}/feed", f"{base}/feed.xml", f"{base}/rss",
+        f"{base}/rss.xml", f"{base}/atom.xml",
+    ]
+    if prefer_keywords and "podcast" in prefer_keywords:
+        patterns.insert(1, f"{base}/podcast/feed")
+    for pattern in patterns:
         if pattern not in candidates:
             candidates.append(pattern)
 
@@ -629,6 +684,11 @@ async def _discover_podcast_feed(url: str) -> str | None:
             continue
 
     return None
+
+
+async def _discover_podcast_feed(url: str) -> str | None:
+    """Discover a podcast RSS feed URL from a website URL."""
+    return await _discover_feed(url, prefer_keywords=["podcast", "audio"])
 
 
 async def _extract_media_url(url: str) -> str | None:
