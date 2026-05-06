@@ -64,6 +64,50 @@ class TestArchive:
         assert "webpage" in valid
 
 
+class TestResolveArchiveDir:
+    def test_archive_with_specified_dir(self):
+        """archive tool uses the specified writable directory."""
+        from readpile.mcp_server import _create_server
+
+        server = _create_server()
+        tools = server._tool_manager._tools
+        archive_fn = tools["archive"].fn
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = archive_fn(
+                content="Test content",
+                title="Test Article",
+                source_url="https://example.com/test",
+                dir=tmpdir,
+            )
+            assert tmpdir in result
+            assert result.endswith(".md")
+
+    def test_archive_permission_error_uses_fallback(self):
+        """When specified dir is not writable, falls back to ./readpile-output."""
+        import shutil
+        from pathlib import Path
+        from readpile.mcp_server import _create_server
+
+        server = _create_server()
+        tools = server._tool_manager._tools
+        archive_fn = tools["archive"].fn
+
+        try:
+            result = archive_fn(
+                content="Test content",
+                title="Test Article",
+                source_url="https://example.com/test",
+                dir="/nonexistent-root-dir/that/cannot/be/created",
+            )
+            assert result.endswith(".md")
+            assert "readpile-output" in result
+        finally:
+            fallback = Path("readpile-output")
+            if fallback.exists():
+                shutil.rmtree(fallback)
+
+
 class TestMcpServerStructure:
     def test_server_name(self):
         assert mcp.name == "readpile"

@@ -24,6 +24,20 @@ Modes: `auto`, `rss`, `blog`, `site`, `podcast`, `youtube`
 - `mode="blog"`: Discovers blog post URLs via Playwright or HTTP fallback. Returns URLs in alphabetical order (not chronological). For date-sorted results, use `mode="rss"` instead
 - `recent=N`: Limit to N most recent entries (RSS/podcast/youtube modes)
 
+### YouTube IP blocks
+
+YouTube may block transcript requests from certain IPs (cloud, corporate, VPN). When this happens,
+readpile automatically falls back to yt-dlp with cookie authentication. If that also fails,
+the error message tells the user how to export browser cookies. The cookie file is checked at:
+1. `~/.readpile/youtube-cookies.txt`
+2. `YOUTUBE_COOKIES` env var
+3. `youtube_cookies` in `~/.readpile/config.toml`
+
+If a user reports YouTube transcription failing, suggest they export cookies:
+```
+yt-dlp --cookies-from-browser chrome --cookies ~/.readpile/youtube-cookies.txt https://youtube.com
+```
+
 ### Workflows
 
 **YouTube channel transcription:**

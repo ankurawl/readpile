@@ -23,6 +23,8 @@ engine = "auto"
 whisper_model = "base"
 diarize = false
 # HuggingFace token via env: HF_TOKEN
+# YouTube cookies for bypassing IP bans (see README for setup):
+# youtube_cookies = "~/.readpile/youtube-cookies.txt"
 
 [scrape]
 headless = true

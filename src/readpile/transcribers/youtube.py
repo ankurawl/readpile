@@ -12,13 +12,17 @@ except ImportError:
 try:
     from youtube_transcript_api import YouTubeTranscriptApi
     from youtube_transcript_api._errors import (
+        IpBlocked,
         NoTranscriptFound,
+        RequestBlocked,
         TranscriptsDisabled,
         VideoUnavailable,
     )
 except ImportError:
     YouTubeTranscriptApi = None  # type: ignore[assignment,misc]
+    IpBlocked = None  # type: ignore[assignment,misc]
     NoTranscriptFound = None  # type: ignore[assignment,misc]
+    RequestBlocked = None  # type: ignore[assignment,misc]
     TranscriptsDisabled = None  # type: ignore[assignment,misc]
     VideoUnavailable = None  # type: ignore[assignment,misc]
 
@@ -76,6 +80,110 @@ def _format_duration(seconds: int) -> str:
     return f"{minutes}:{secs:02d}"
 
 
+def _group_into_paragraphs(lines: list[str]) -> str:
+    """Group transcript lines into paragraphs of roughly five lines each."""
+    paragraphs: list[str] = []
+    chunk: list[str] = []
+    for line in lines:
+        chunk.append(line)
+        if len(chunk) >= 5:
+            paragraphs.append(" ".join(chunk))
+            chunk = []
+    if chunk:
+        paragraphs.append(" ".join(chunk))
+    return "\n\n".join(paragraphs)
+
+
+def _get_transcript_via_ytdlp(video_id: str, language: str) -> str:
+    """Download subtitles via yt-dlp as a fallback when the transcript API
+    is blocked by YouTube.
+
+    Checks for a cookie file in this order:
+      1. ``YOUTUBE_COOKIES`` environment variable
+      2. ``youtube_cookies`` in the ``[transcribe]`` config section
+      3. ``~/.readpile/youtube-cookies.txt`` (default location)
+    """
+    import glob
+    import os
+    import tempfile
+
+    from readpile.core.config import load_config
+
+    url = f"https://www.youtube.com/watch?v={video_id}"
+
+    cookie_path = os.environ.get("YOUTUBE_COOKIES")
+    if not cookie_path:
+        config = load_config()
+        cookie_path = config.get("transcribe", {}).get("youtube_cookies")
+    if not cookie_path:
+        default = os.path.expanduser("~/.readpile/youtube-cookies.txt")
+        if os.path.isfile(default):
+            cookie_path = default
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        outtmpl = os.path.join(tmpdir, "subs")
+        ydl_opts: dict = {
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            "writeautomaticsub": True,
+            "writesubtitles": True,
+            "subtitleslangs": [language],
+            "subtitlesformat": "vtt",
+            "outtmpl": outtmpl,
+        }
+        if cookie_path and os.path.isfile(cookie_path):
+            ydl_opts["cookiefile"] = cookie_path
+
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+        except yt_dlp.utils.DownloadError:
+            raise TranscriptNotAvailableError(
+                "YouTube is blocking transcript requests from this IP.\n"
+                "To fix, export your browser cookies and make them available "
+                "to readpile:\n\n"
+                "  1. Export cookies (run in your terminal, not in a sandbox):\n"
+                "     yt-dlp --cookies-from-browser chrome "
+                "--cookies ~/.readpile/youtube-cookies.txt "
+                "https://youtube.com\n\n"
+                "  2. readpile checks these locations automatically:\n"
+                "     - ~/.readpile/youtube-cookies.txt (recommended)\n"
+                "     - YOUTUBE_COOKIES environment variable\n"
+                "     - youtube_cookies in ~/.readpile/config.toml\n\n"
+                "Cookies expire periodically — re-export when you see this "
+                "error again."
+            )
+
+        vtt_files = glob.glob(os.path.join(tmpdir, "*.vtt"))
+        if not vtt_files:
+            raise TranscriptNotAvailableError(
+                "No subtitles found for this video."
+            )
+
+        with open(vtt_files[0], encoding="utf-8") as fh:
+            vtt_content = fh.read()
+
+    return _parse_vtt(vtt_content)
+
+
+def _parse_vtt(vtt_text: str) -> str:
+    """Parse WebVTT subtitle text into plain transcript paragraphs."""
+    import re
+
+    lines: list[str] = []
+    for line in vtt_text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("WEBVTT") or line.startswith("Kind:") \
+                or line.startswith("Language:") or "-->" in line:
+            continue
+        clean = re.sub(r"<[^>]+>", "", line)
+        if clean and clean not in lines[-1:]:
+            lines.append(clean)
+
+    return _group_into_paragraphs(lines)
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -127,8 +235,9 @@ def get_youtube_metadata(url: str) -> dict:
 def get_youtube_transcript(video_id: str, language: str = "en") -> str:
     """Fetch the transcript for a YouTube video and return it as text.
 
-    Transcript lines are grouped into paragraphs of roughly five lines each,
-    separated by blank lines.
+    Tries ``youtube-transcript-api`` first. If YouTube blocks the request
+    (IP ban), falls back to downloading subtitles via ``yt-dlp`` with
+    optional cookie authentication.
 
     Parameters
     ----------
@@ -161,6 +270,8 @@ def get_youtube_transcript(video_id: str, language: str = "en") -> str:
         raise TranscriptNotAvailableError(
             "No transcript available for this video."
         )
+    except (IpBlocked, RequestBlocked):
+        return _get_transcript_via_ytdlp(video_id, language)
 
     try:
         transcript = transcript_list.find_transcript([language])
@@ -172,19 +283,7 @@ def get_youtube_transcript(video_id: str, language: str = "en") -> str:
 
     segments = transcript.fetch()
     lines = [segment.text for segment in segments]
-
-    # Group into paragraphs every ~5 lines
-    paragraphs: list[str] = []
-    chunk: list[str] = []
-    for line in lines:
-        chunk.append(line)
-        if len(chunk) >= 5:
-            paragraphs.append(" ".join(chunk))
-            chunk = []
-    if chunk:
-        paragraphs.append(" ".join(chunk))
-
-    return "\n\n".join(paragraphs)
+    return _group_into_paragraphs(lines)
 
 
 def transcribe_youtube(url: str, language: str = "en") -> ContentItem:

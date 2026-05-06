@@ -4,7 +4,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)]()
-[![Tests](https://img.shields.io/badge/tests-234%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-241%20passing-brightgreen.svg)]()
 
 ---
 
@@ -100,12 +100,34 @@ content https://example.com/post --archive
 
 readpile ships as an [MCP server](https://modelcontextprotocol.io/) that any compatible LLM client can discover and use. Once connected, your LLM becomes a librarian — it can collect pages, transcribe videos, crawl sites, and archive content into your library, then help you read, compare, or make sense of what you've gathered.
 
-**Claude Code** — auto-configured via `.mcp.json` at the repo root:
+**Claude Code (repo-local)** — auto-configured via `.mcp.json` at the repo root:
 
 ```bash
 pip install readpile[mcp]
 python -m playwright install chromium
-# Claude Code discovers the server automatically
+# Claude Code discovers the server automatically when launched from this directory
+```
+
+**Claude Code (global — available from any directory):**
+
+```bash
+# 1. Install readpile globally
+pip install readpile[mcp]
+python -m playwright install chromium
+
+# 2. Add to Claude Code as a global MCP server (pick one):
+
+# Option A: Use the claude CLI
+claude mcp add --scope user readpile -- readpile-mcp
+
+# Option B: Manually edit ~/.claude.json
+#   Find the "mcpServers" section and add:
+#   "readpile": {
+#     "command": "readpile-mcp",
+#     "args": [],
+#     "env": {},
+#     "type": "stdio"
+#   }
 ```
 
 **Other MCP clients** — add to your client's MCP configuration:
@@ -369,6 +391,37 @@ max_pages = 100
 | `HF_TOKEN` | HuggingFace token for speaker diarization |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token |
 | `READPILE_CONFIG` | Override config file path |
+| `YOUTUBE_COOKIES` | Path to a Netscape cookie file for YouTube (see [YouTube IP Blocks](#youtube-ip-blocks)) |
+
+---
+
+## YouTube IP Blocks
+
+YouTube aggressively rate-limits transcript/caption requests from cloud providers, corporate networks, and VPNs. If you see errors like "YouTube is blocking transcript requests from this IP," your IP has been flagged.
+
+readpile handles this automatically: when the fast transcript API is blocked, it falls back to `yt-dlp` with cookie authentication. You just need to provide cookies from a logged-in browser session.
+
+### Setup (one-time)
+
+```bash
+# Export cookies from your browser (run in your regular terminal, not inside a sandbox):
+yt-dlp --cookies-from-browser chrome --cookies ~/.readpile/youtube-cookies.txt https://youtube.com
+```
+
+readpile checks these locations automatically (in order):
+1. `~/.readpile/youtube-cookies.txt` (recommended — just put the file here)
+2. `YOUTUBE_COOKIES` environment variable pointing to a cookie file
+3. `youtube_cookies` setting in `~/.readpile/config.toml`
+
+Cookies expire periodically. Re-run the export command when you see the IP block error again.
+
+### Browser options
+
+Replace `chrome` with your browser: `firefox`, `safari`, `edge`, `chromium`, `opera`, or `brave`.
+
+### Why this happens
+
+YouTube's caption API blocks requests that don't come from a recognized browser session. The `youtube-transcript-api` library (which readpile uses for fast, free transcription) makes unauthenticated requests that YouTube increasingly rejects. Browser cookies prove you're a real user with a valid session.
 
 ---
 
@@ -394,6 +447,14 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,all]"
 python -m playwright install chromium
 ```
+
+> **MCP with a venv:** The repo's `.mcp.json` uses `readpile-mcp`, which must be in PATH.
+> When developing from source in a venv, Claude Code can't find the venv binary.
+> Fix by updating `.mcp.json` locally:
+> ```json
+> { "command": ".venv/bin/readpile-mcp" }
+> ```
+> Or install globally alongside the venv: `pip install -e ".[mcp]"` (without the venv activated).
 
 ### System dependencies
 
@@ -422,7 +483,7 @@ src/readpile/
 ## Running Tests
 
 ```bash
-pytest tests/ -v                                           # full suite (234 tests)
+pytest tests/ -v                                           # full suite (236 tests)
 pytest tests/ -m "not slow and not network and not audio"  # fast tests only
 ```
 

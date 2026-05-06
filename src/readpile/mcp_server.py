@@ -229,6 +229,32 @@ def _create_server():
         except SystemExit as e:
             return [str(e)]
 
+    def _resolve_archive_dir(specified_dir: str | None = None) -> Path:
+        """Resolve the archive output directory, with automatic fallback.
+
+        Tries the specified or configured directory first. If it can't be
+        created (e.g., home directory not writable in a sandbox), falls back
+        to ``./readpile-output/`` relative to the current working directory.
+        """
+        from pathlib import Path
+        from readpile.core.config import load_config
+
+        if specified_dir is not None:
+            target = Path(specified_dir).expanduser()
+        else:
+            config = load_config()
+            target = Path(
+                config.get("general", {}).get("output_dir", "~/readpile-output")
+            ).expanduser()
+
+        try:
+            target.mkdir(parents=True, exist_ok=True)
+            return target
+        except (PermissionError, OSError):
+            fallback = Path("readpile-output").resolve()
+            fallback.mkdir(parents=True, exist_ok=True)
+            return fallback
+
     @mcp.tool()
     def archive(
         content: str,
@@ -256,7 +282,6 @@ def _create_server():
             from pathlib import Path
             from readpile.core.models import ContentItem, ContentType
             from readpile.core.archiver import Archiver
-            from readpile.core.config import load_config
 
             try:
                 ct = ContentType(content_type)
@@ -281,14 +306,7 @@ def _create_server():
                 author=author,
             )
 
-            if dir is not None:
-                output_dir = Path(dir).expanduser()
-            else:
-                config = load_config()
-                output_dir = Path(
-                    config.get("general", {}).get("output_dir", "~/readpile-output")
-                ).expanduser()
-
+            output_dir = _resolve_archive_dir(dir)
             archiver = Archiver(output_dir)
             saved_path = archiver.save(item)
             return str(saved_path)
@@ -352,10 +370,10 @@ def _create_server():
         result = ContentItem.to_batch(list(items))
 
         if archive_dir:
-            from pathlib import Path
             from readpile.core.archiver import Archiver
 
-            archiver = Archiver(Path(archive_dir).expanduser())
+            output_path = _resolve_archive_dir(archive_dir)
+            archiver = Archiver(output_path)
             saved: list[str] = []
             for item in items:
                 if not item.title.startswith("Failed:"):
