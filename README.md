@@ -4,7 +4,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)]()
-[![Tests](https://img.shields.io/badge/tests-217%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-225%20passing-brightgreen.svg)]()
 
 ---
 
@@ -127,7 +127,7 @@ Available MCP tools:
 | MCP Tool | What it does |
 |----------|-------------|
 | `scrape(url)` | Extract article/webpage content as Markdown |
-| `transcribe(source, language)` | Transcribe YouTube or audio/video URLs |
+| `transcribe(source, language, fallback_url)` | Transcribe YouTube, audio/video URLs, or webpages with embedded YouTube. Use `fallback_url` for podcast episodes where audio needs ffmpeg but the webpage has a YouTube embed |
 | `crawl(url, mode, recent, limit, metadata)` | Discover content URLs from feeds, blogs, sites, YouTube channels, or podcasts |
 | `batch_scrape(urls, concurrency)` | Scrape multiple URLs in one call with concurrency control |
 | `archive(content, title, source_url, date, author, dir)` | Save content to disk as a Markdown file |
@@ -201,6 +201,13 @@ Using MCP, your LLM can find podcast episodes and get structured metadata in one
 crawl("newsletter.com/podcast", mode="podcast", recent=10)
   → auto-discovers RSS feed, filters to audio episodes
   → returns JSON with title, date, description, audio URL, duration per episode
+
+transcribe(episode_url)
+  → if episode page has an embedded YouTube player, transcribes via captions (no ffmpeg needed)
+
+transcribe(audio_url, fallback_url=episode_url)
+  → tries audio transcription first; if ffmpeg is missing, checks the episode
+    webpage for an embedded YouTube video and transcribes that instead
 ```
 
 ### Collect from behind a login wall

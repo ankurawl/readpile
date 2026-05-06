@@ -7,7 +7,7 @@ Content extraction toolkit for LLMs. Build a personal library from articles, vid
 readpile exposes 6 tools via MCP (Model Context Protocol):
 
 - **scrape** — Extract article/webpage content from a URL (YAML front matter + markdown)
-- **transcribe** — Transcribe YouTube videos or audio/video URLs
+- **transcribe** — Transcribe YouTube videos, audio/video URLs, or webpages with embedded YouTube players
 - **crawl** — Discover content URLs from RSS feeds, blogs, sites, or podcasts
 - **batch_scrape** — Scrape multiple URLs in one call with concurrency control
 - **archive** — Save content to disk as markdown files
@@ -34,7 +34,9 @@ archive(content, title, source_url)    → Save to disk (one call per item)
 **Podcast discovery and summarization:**
 ```
 crawl(url, mode="podcast", recent=15)  → JSON metadata with episode titles, dates, descriptions, audio URLs
-transcribe(audio_url)                  → Full transcript of a specific episode
+transcribe(episode_url)                → Full transcript via embedded YouTube (many podcasts embed YT players)
+transcribe(audio_url,                  → If audio fails (no ffmpeg), fallback_url checks the episode
+  fallback_url=episode_url)              webpage for an embedded YouTube video and transcribes that instead
 archive(content, title, source_url)    → Save to disk (one call per item)
 ```
 

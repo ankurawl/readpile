@@ -284,6 +284,187 @@ class TestDiscoverPodcastFeed:
         asyncio.run(_run())
 
 
+class TestTranscribeFallback:
+    @patch("readpile.mcp_server._extract_media_url")
+    def test_audio_with_fallback_url(self, mock_extract):
+        """When audio transcription fails (no ffmpeg) and fallback_url has
+        a YouTube embed, transcribe via YouTube captions instead."""
+        import asyncio
+        from readpile.core.models import ContentItem, ContentType
+
+        mock_extract.return_value = "https://www.youtube.com/watch?v=test123test"
+
+        yt_item = ContentItem(
+            text="Transcript here",
+            title="Episode Title",
+            source_url="https://www.youtube.com/watch?v=test123test",
+            content_type=ContentType.youtube,
+        )
+
+        async def _run():
+            from readpile.mcp_server import _create_server
+
+            server = _create_server()
+            tools = server._tool_manager._tools
+            transcribe_fn = tools["transcribe"].fn
+
+            with patch(
+                "readpile.transcribers.youtube.transcribe_youtube",
+                return_value=yt_item,
+            ):
+                result = await transcribe_fn(
+                    source="https://example.com/episode.mp3",
+                    language="en",
+                    fallback_url="https://example.com/p/episode-page",
+                )
+            assert "Transcript here" in result
+            assert "Episode Title" in result
+
+        asyncio.run(_run())
+
+    @patch("readpile.mcp_server._extract_media_url")
+    def test_audio_with_fallback_no_embed(self, mock_extract):
+        """When fallback_url has no YouTube embed, return error message."""
+        import asyncio
+
+        mock_extract.return_value = None
+
+        async def _run():
+            from readpile.mcp_server import _create_server
+
+            server = _create_server()
+            tools = server._tool_manager._tools
+            transcribe_fn = tools["transcribe"].fn
+            result = await transcribe_fn(
+                source="https://example.com/episode.mp3",
+                language="en",
+                fallback_url="https://example.com/p/no-embed",
+            )
+            assert "Error" in result
+            assert "ffmpeg" in result
+
+        asyncio.run(_run())
+
+    def test_audio_without_fallback_url(self):
+        """When audio transcription fails and no fallback_url, return error."""
+        import asyncio
+
+        async def _run():
+            from readpile.mcp_server import _create_server
+
+            server = _create_server()
+            tools = server._tool_manager._tools
+            transcribe_fn = tools["transcribe"].fn
+            result = await transcribe_fn(
+                source="https://example.com/episode.mp3",
+                language="en",
+            )
+            assert "Error" in result
+            assert "ffmpeg" in result
+
+        asyncio.run(_run())
+
+    @patch("readpile.mcp_server._extract_media_url")
+    def test_webpage_with_youtube_embed(self, mock_extract):
+        """Webpage URLs should find and transcribe embedded YouTube videos."""
+        import asyncio
+        from readpile.core.models import ContentItem, ContentType
+
+        mock_extract.return_value = "https://www.youtube.com/watch?v=abc12345678"
+
+        yt_item = ContentItem(
+            text="Video transcript",
+            title="Podcast Episode",
+            source_url="https://www.youtube.com/watch?v=abc12345678",
+            content_type=ContentType.youtube,
+        )
+
+        async def _run():
+            from readpile.mcp_server import _create_server
+
+            server = _create_server()
+            tools = server._tool_manager._tools
+            transcribe_fn = tools["transcribe"].fn
+
+            with patch(
+                "readpile.transcribers.youtube.transcribe_youtube",
+                return_value=yt_item,
+            ):
+                result = await transcribe_fn(
+                    source="https://example.com/p/episode-page",
+                    language="en",
+                )
+            assert "Video transcript" in result
+
+        asyncio.run(_run())
+
+
+class TestTranscribeViaFallback:
+    @patch("readpile.mcp_server._extract_media_url")
+    def test_returns_transcript_on_youtube_embed(self, mock_extract):
+        """_transcribe_via_fallback returns transcript when YouTube found."""
+        import asyncio
+        from readpile.core.models import ContentItem, ContentType
+
+        mock_extract.return_value = "https://www.youtube.com/watch?v=xyz12345678"
+
+        yt_item = ContentItem(
+            text="Fallback transcript",
+            title="Fallback Episode",
+            source_url="https://www.youtube.com/watch?v=xyz12345678",
+            content_type=ContentType.youtube,
+        )
+
+        async def _run():
+            from readpile.mcp_server import _transcribe_via_fallback
+
+            with patch(
+                "readpile.transcribers.youtube.transcribe_youtube",
+                return_value=yt_item,
+            ):
+                result = await _transcribe_via_fallback(
+                    "https://example.com/page", "en"
+                )
+            assert result is not None
+            assert "Fallback transcript" in result
+
+        asyncio.run(_run())
+
+    @patch("readpile.mcp_server._extract_media_url")
+    def test_returns_none_when_no_media(self, mock_extract):
+        """_transcribe_via_fallback returns None when no media found."""
+        import asyncio
+
+        mock_extract.return_value = None
+
+        async def _run():
+            from readpile.mcp_server import _transcribe_via_fallback
+
+            result = await _transcribe_via_fallback(
+                "https://example.com/page", "en"
+            )
+            assert result is None
+
+        asyncio.run(_run())
+
+    @patch("readpile.mcp_server._extract_media_url")
+    def test_returns_none_for_non_youtube_media(self, mock_extract):
+        """_transcribe_via_fallback returns None for non-YouTube media."""
+        import asyncio
+
+        mock_extract.return_value = "https://example.com/audio.mp3"
+
+        async def _run():
+            from readpile.mcp_server import _transcribe_via_fallback
+
+            result = await _transcribe_via_fallback(
+                "https://example.com/page", "en"
+            )
+            assert result is None
+
+        asyncio.run(_run())
+
+
 class TestBatchScrape:
     def test_empty_urls(self):
         """batch_scrape with empty list returns message."""

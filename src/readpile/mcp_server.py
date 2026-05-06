@@ -28,11 +28,24 @@ def _create_server():
             return str(e)
 
     @mcp.tool()
-    async def transcribe(source: str, language: str = "en") -> str:
+    async def transcribe(
+        source: str,
+        language: str = "en",
+        fallback_url: str | None = None,
+    ) -> str:
         """Transcribe audio/video content from a URL.
 
         Supports YouTube URLs, direct audio/video URLs, and blog/webpage URLs
         that contain embedded YouTube videos or audio players.
+
+        Args:
+            source: URL to transcribe (YouTube, audio/video file, or webpage).
+            language: Language code for transcription (default: "en").
+            fallback_url: Optional webpage URL to check for embedded YouTube
+                videos if the primary source fails. Useful for podcast episodes
+                where the audio URL requires ffmpeg but the episode webpage has
+                an embedded YouTube player.
+
         Returns YAML front matter + markdown transcript.
         """
         try:
@@ -49,9 +62,25 @@ def _create_server():
             if url_type in (URLType.audio_file, URLType.video):
                 if "://" not in source:
                     return "Error: local file paths are not supported. Provide a URL."
-                from readpile.transcribers.audio import transcribe_from_url
-                item = transcribe_from_url(resolved)
-                return item.to_stdout()
+                try:
+                    from readpile.transcribers.audio import transcribe_from_url
+                    item = transcribe_from_url(resolved)
+                    return item.to_stdout()
+                except SystemExit:
+                    if fallback_url:
+                        result = await _transcribe_via_fallback(
+                            _ensure_scheme(fallback_url), language
+                        )
+                        if result:
+                            return result
+                    return (
+                        "Error: Audio transcription requires ffmpeg and whisper, "
+                        "which are not installed. Alternatives:\n"
+                        "- Provide the episode's webpage URL instead (if it has "
+                        "an embedded YouTube video, transcription works without ffmpeg)\n"
+                        "- Use fallback_url parameter with the episode webpage URL\n"
+                        "- Install ffmpeg: brew install ffmpeg"
+                    )
 
             if url_type in (URLType.blog, URLType.website):
                 media_url = await _extract_media_url(resolved)
@@ -62,9 +91,15 @@ def _create_server():
                         item = transcribe_youtube(media_url, language)
                         return item.to_stdout()
                     if media_type in (URLType.audio_file, URLType.video):
-                        from readpile.transcribers.audio import transcribe_from_url
-                        item = transcribe_from_url(media_url)
-                        return item.to_stdout()
+                        try:
+                            from readpile.transcribers.audio import transcribe_from_url
+                            item = transcribe_from_url(media_url)
+                            return item.to_stdout()
+                        except SystemExit:
+                            return (
+                                f"Error: Found audio at {media_url} but ffmpeg is "
+                                "not installed. Install: brew install ffmpeg"
+                            )
                 return (
                     f"Error: No embedded YouTube video or audio found at {resolved}. "
                     "Try providing a direct YouTube or audio URL instead."
@@ -649,6 +684,26 @@ async def _extract_media_url(url: str) -> str | None:
     )
     if yt_match:
         return f"https://www.youtube.com/watch?v={yt_match.group(1)}"
+
+    return None
+
+
+async def _transcribe_via_fallback(fallback_url: str, language: str) -> str | None:
+    """Try to transcribe by finding an embedded YouTube video at fallback_url.
+
+    Returns the transcript string on success, or None if no YouTube embed found.
+    """
+    from readpile.core.detector import detect_url_type, URLType
+
+    media_url = await _extract_media_url(fallback_url)
+    if not media_url:
+        return None
+
+    media_type = detect_url_type(media_url)
+    if media_type == URLType.youtube:
+        from readpile.transcribers.youtube import transcribe_youtube
+        item = transcribe_youtube(media_url, language)
+        return item.to_stdout()
 
     return None
 
