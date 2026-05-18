@@ -15,6 +15,7 @@ def test_defaults():
     assert config["scrape"]["headless"] is True
     assert config["transcribe"]["engine"] == "auto"
     assert config["crawl"]["max_depth"] == 10
+    assert config["wiki"]["default_dir"] == ""
     assert "summarize" not in config
 
 
