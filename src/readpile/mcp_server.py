@@ -387,6 +387,290 @@ def _create_server():
 
         return result
 
+    # ------------------------------------------------------------------
+    # Wiki tools
+    # ------------------------------------------------------------------
+
+    def _resolve_wiki_dir(wiki_dir: str | None, require_existing: bool = True) -> "Path":
+        from pathlib import Path
+        from readpile.core.config import load_config
+
+        if wiki_dir is not None:
+            resolved = Path(wiki_dir).expanduser().resolve()
+        else:
+            config = load_config()
+            default = config.get("wiki", {}).get("default_dir", "")
+            if not default:
+                raise ValueError(
+                    "No wiki directory specified. Pass wiki_dir or set "
+                    "[wiki] default_dir in ~/.readpile/config.toml"
+                )
+            resolved = Path(default).expanduser().resolve()
+
+        if require_existing:
+            if not (resolved / ".wiki.toml").exists():
+                raise FileNotFoundError(
+                    f"No wiki found at {resolved}. Run wiki_init to create one."
+                )
+
+        return resolved
+
+    @mcp.tool()
+    def wiki_init(
+        path: str,
+        name: str,
+        description: str = "",
+        categories: list[str] | None = None,
+    ) -> str:
+        """Create a new wiki with directory structure, config, and conventions file.
+
+        Args:
+            path: Directory path for the new wiki.
+            name: Wiki name (used in index header).
+            description: Short description of the wiki's purpose.
+            categories: Page categories (default: concept, entity, summary,
+                comparison, exploration, reference).
+
+        Returns confirmation with the conventions file content so the LLM
+        has the ingest recipe immediately.
+        """
+        try:
+            from readpile.wiki import WikiStore
+
+            store = WikiStore(path)
+            wiki_path = store.init(name, description, categories)
+            conventions = store.load_conventions()
+            return (
+                f"Wiki created at {wiki_path}\n\n"
+                f"Customize wiki-conventions.md to adjust LLM behavior.\n\n"
+                f"--- Conventions ---\n{conventions}"
+            )
+        except FileExistsError as e:
+            return f"Error: {e}"
+
+    @mcp.tool()
+    def wiki_save_source(
+        content: str,
+        title: str,
+        source_url: str,
+        content_type: str = "article",
+        date: str | None = None,
+        author: str | None = None,
+        wiki_dir: str | None = None,
+    ) -> str:
+        """Save raw content to the wiki's sources/ directory.
+
+        For the full ingest workflow, read the wiki conventions first via
+        wiki_read('conventions').
+
+        Args:
+            content: The text content to save.
+            title: Title for the content.
+            source_url: Original source URL.
+            content_type: One of: article, youtube, audio, podcast, webpage.
+            date: Publish date in YYYY-MM-DD format.
+            author: Author name.
+            wiki_dir: Wiki directory (default: config value).
+
+        Returns the path to the saved source file.
+        """
+        try:
+            from readpile.wiki import WikiStore
+
+            resolved = _resolve_wiki_dir(wiki_dir)
+            store = WikiStore(resolved)
+            path = store.save_source(content, title, source_url, content_type, date, author)
+            return str(path)
+        except (ValueError, FileNotFoundError) as e:
+            return f"Error: {e}"
+
+    @mcp.tool()
+    def wiki_read(
+        page: str,
+        wiki_dir: str | None = None,
+    ) -> str:
+        """Read a wiki page, source, or special file by name.
+
+        Supports special names: "index" (auto-generated catalog), "log"
+        (operation timeline), "conventions" (behavioral playbook).
+        Supports sources/ paths: wiki_read("sources/2026-05-10_article-name")
+        reads from the sources directory.
+
+        Args:
+            page: Page name (without .md), or "index", "log", "conventions",
+                or "sources/filename".
+            wiki_dir: Wiki directory (default: config value).
+
+        Returns the page content as markdown.
+        """
+        try:
+            from readpile.wiki import WikiStore
+
+            resolved = _resolve_wiki_dir(wiki_dir)
+            store = WikiStore(resolved)
+            return store.read_page(page)
+        except FileNotFoundError as e:
+            pages = []
+            try:
+                from readpile.wiki import WikiStore as WS
+                s = WS(_resolve_wiki_dir(wiki_dir))
+                pages = [p["name"] for p in s.list_pages()]
+            except Exception:
+                pass
+            page_list = ", ".join(pages) if pages else "none"
+            return f"Error: {e}\nAvailable pages: {page_list}"
+        except (ValueError,) as e:
+            return f"Error: {e}"
+
+    @mcp.tool()
+    def wiki_write(
+        content: str,
+        wiki_dir: str | None = None,
+        page: str | None = None,
+        rebuild_index: bool = True,
+    ) -> str:
+        """Create or update a wiki page in pages/.
+
+        See wiki_read('conventions') for page creation rules and frontmatter
+        guidance. Pass rebuild_index=false when writing multiple pages, then
+        true (or omit) on the last write.
+
+        Args:
+            content: Full page content with YAML frontmatter (title, category,
+                ingested, updated are required).
+            wiki_dir: Wiki directory (default: config value).
+            page: Page filename (without .md). If omitted, auto-generated
+                from title.
+            rebuild_index: Rebuild index.md after writing (default: true).
+
+        Returns confirmation with the page path.
+        """
+        try:
+            from readpile.wiki import WikiStore
+
+            resolved = _resolve_wiki_dir(wiki_dir)
+            store = WikiStore(resolved)
+            path = store.write_page(page, content, rebuild_index)
+            msg = f"Page written: {path}"
+            if rebuild_index:
+                msg += "\nIndex auto-rebuilt."
+            return msg
+        except (ValueError, FileNotFoundError) as e:
+            return f"Error: {e}"
+
+    @mcp.tool()
+    def wiki_list(
+        wiki_dir: str | None = None,
+        category: str | None = None,
+    ) -> str:
+        """List all wiki pages with metadata.
+
+        Args:
+            wiki_dir: Wiki directory (default: config value).
+            category: Filter to a specific category.
+
+        Returns one line per page: name — title [category].
+        """
+        try:
+            from readpile.wiki import WikiStore
+
+            resolved = _resolve_wiki_dir(wiki_dir)
+            store = WikiStore(resolved)
+            pages = store.list_pages(category)
+            if not pages:
+                return "No pages found."
+            lines = [f"{p['name']} — {p['title']} [{p['category']}]" for p in pages]
+            return "\n".join(lines)
+        except (ValueError, FileNotFoundError) as e:
+            return f"Error: {e}"
+
+    @mcp.tool()
+    def wiki_search(
+        query: str,
+        wiki_dir: str | None = None,
+        scope: str = "pages",
+    ) -> str:
+        """Full-text search across wiki pages and/or sources.
+
+        Args:
+            query: Search term (case-insensitive substring match).
+            wiki_dir: Wiki directory (default: config value).
+            scope: Search scope — "pages" (default), "sources", or "all".
+
+        Returns matching pages with context snippets.
+        """
+        try:
+            from readpile.wiki import WikiStore
+
+            resolved = _resolve_wiki_dir(wiki_dir)
+            store = WikiStore(resolved)
+            results = store.search(query, scope)
+            if not results:
+                return "No results found."
+            lines = []
+            for r in results:
+                lines.append(f"### {r['name']} — {r['title']}")
+                for m in r["matches"]:
+                    lines.append(f"  Line {m['line_number']}:")
+                    for ctx_line in m["context"].splitlines():
+                        lines.append(f"    {ctx_line}")
+                lines.append("")
+            return "\n".join(lines)
+        except (ValueError, FileNotFoundError) as e:
+            return f"Error: {e}"
+
+    @mcp.tool()
+    def wiki_log(
+        entry: str,
+        wiki_dir: str | None = None,
+    ) -> str:
+        """Append a timestamped entry to the wiki log.
+
+        The tool handles the ## [date] prefix and file append — pass only the
+        new entry text (e.g., 'ingest | "Title" | URL\\n- Created page: x.md').
+
+        Args:
+            entry: Log entry text (without date prefix).
+            wiki_dir: Wiki directory (default: config value).
+
+        Returns confirmation with the appended entry.
+        """
+        try:
+            from readpile.wiki import WikiStore
+            from datetime import date
+
+            resolved = _resolve_wiki_dir(wiki_dir)
+            store = WikiStore(resolved)
+            store.append_log(entry)
+            return f"Logged: ## [{date.today().isoformat()}] {entry}"
+        except (ValueError, FileNotFoundError) as e:
+            return f"Error: {e}"
+
+    @mcp.tool()
+    def wiki_delete(
+        page: str,
+        wiki_dir: str | None = None,
+    ) -> str:
+        """Delete a wiki page and rebuild the index.
+
+        Args:
+            page: Page name to delete (without .md extension).
+            wiki_dir: Wiki directory (default: config value).
+
+        Returns confirmation. Follow up with wiki_log to record the deletion.
+        """
+        try:
+            from readpile.wiki import WikiStore
+
+            resolved = _resolve_wiki_dir(wiki_dir)
+            store = WikiStore(resolved)
+            store.delete_page(page)
+            return f"Deleted page: {page}\nIndex auto-rebuilt."
+        except FileNotFoundError as e:
+            return f"Error: {e}"
+        except ValueError as e:
+            return f"Error: {e}"
+
     return mcp
 
 

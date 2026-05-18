@@ -35,6 +35,9 @@ DEFAULTS: dict = {
         "whitelist_file": "~/.readpile/whitelist.json",
         "preferences_file": "~/.readpile/preferences.json",
     },
+    "wiki": {
+        "default_dir": "",
+    },
 }
 
 # ---------------------------------------------------------------------------

@@ -70,6 +70,15 @@ def init() -> None:
         output_dir=output_dir,
         auto_archive=str(auto_archive).lower(),
     )
+
+    wiki_dir = typer.prompt(
+        "Wiki directory (leave empty to skip)",
+        default="",
+        show_default=False,
+    )
+    if wiki_dir:
+        content += f'\n[wiki]\ndefault_dir = "{wiki_dir}"\n'
+
     config_path.write_text(content, encoding="utf-8")
 
     typer.echo(f"Config written to {config_path}")
