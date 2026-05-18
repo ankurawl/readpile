@@ -4,7 +4,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)]()
-[![Tests](https://img.shields.io/badge/tests-241%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-335%20passing-brightgreen.svg)]()
 
 ---
 
@@ -17,6 +17,7 @@ The best content on the web is scattered across blogs, YouTube channels, podcast
 ### What you can do with it
 
 - **Build your library** — Collect articles, transcripts, and documentation into a personal archive you own. Search across everything, revisit old reads, and keep a growing reference collection that's always available.
+- **Build a knowledge wiki** — Let your LLM synthesize collected content into a persistent, cross-referenced wiki that compounds knowledge over time. Inspired by [Karpathy's LLMWiki concept](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
 - **Catch up on your terms** — Pull the last 10 posts from a blog, 5 episodes from a podcast, or a full YouTube playlist. Skim now, read deeply later, or save as reference material — your schedule, your pace.
 - **Create custom digests** — Combine content from multiple sources into a single briefing. Shortlist the pieces that matter, summarize the rest, and start your day already caught up.
 - **Give your LLM eyes and ears** — Connect readpile as an MCP server and your AI assistant can read any webpage, watch any YouTube video, or crawl any site — then help you search, compare, and make sense of it all.
@@ -154,6 +155,14 @@ Available MCP tools:
 | `batch_scrape(urls, concurrency, archive_dir)` | Scrape multiple URLs in one call with concurrency control. Use `archive_dir` to save all results to disk |
 | `archive(content, title, source_url, date, author, dir)` | Save content to disk as a Markdown file |
 | `detect_type(url)` | Identify URL type (youtube, youtube_channel, rss, blog, audio, etc.) |
+| `wiki_init(path, name, ...)` | Create a wiki with directory structure, config, and conventions |
+| `wiki_save_source(content, ...)` | Save raw content to the wiki's `sources/` directory |
+| `wiki_read(page, ...)` | Read a wiki page, source, or special file (index, log, conventions) |
+| `wiki_write(content, ...)` | Create or update a wiki page with frontmatter validation |
+| `wiki_list(...)` | List all wiki pages with metadata |
+| `wiki_search(query, ...)` | Full-text search across pages and/or sources |
+| `wiki_log(entry, ...)` | Append a timestamped entry to the wiki log |
+| `wiki_delete(page, ...)` | Delete a wiki page and rebuild the index |
 
 The `crawl` tool supports these modes:
 
@@ -317,8 +326,19 @@ crawl URL | scrape --batch | archive --batch --dir ./blog/
 
 ```bash
 readpile init
-# Prompts: archive by default? output directory?
+# Prompts: archive by default? output directory? wiki directory?
 # Writes ~/.readpile/config.toml
+```
+
+### `readpile wiki` — Wiki management
+
+```bash
+readpile wiki init ~/my-wiki --name "AI Research"      # create wiki
+readpile wiki list --wiki ~/my-wiki                    # list pages
+readpile wiki list --wiki ~/my-wiki --category concept # filter by category
+readpile wiki search "attention" --wiki ~/my-wiki      # search pages
+readpile wiki log --wiki ~/my-wiki                     # view log
+readpile wiki log --wiki ~/my-wiki --recent 10         # recent entries
 ```
 
 ### `content-bot` — Telegram bot
@@ -384,6 +404,9 @@ rate_limit = 1.0                      # seconds between requests
 [crawl]
 max_depth = 10
 max_pages = 100
+
+[wiki]
+default_dir = ""                      # default wiki directory for MCP tools
 ```
 
 | Environment Variable | Description |
@@ -469,12 +492,13 @@ python -m playwright install chromium
 
 ```
 src/readpile/
-├── cli/             # CLI entry points (one per command)
+├── cli/             # CLI entry points (main.py parent app, wiki.py subcommands)
 ├── scrapers/        # Article + webpage content extraction
 ├── transcribers/    # YouTube captions + Whisper audio transcription
 ├── crawlers/        # RSS, blog, and site URL discovery
 ├── core/            # Config, models, archiver, URL detector, robots.txt
 ├── bot/             # Telegram bot
+├── wiki/            # LLMWiki module (models.py, store.py)
 └── mcp_server.py    # MCP server (FastMCP)
 ```
 
@@ -483,9 +507,108 @@ src/readpile/
 ## Running Tests
 
 ```bash
-pytest tests/ -v                                           # full suite (236 tests)
+pytest tests/ -v                                           # full suite (335 tests)
 pytest tests/ -m "not slow and not network and not audio"  # fast tests only
 ```
+
+---
+
+## LLMWiki
+
+readpile includes an LLM-maintained wiki layer inspired by [Karpathy's LLMWiki concept](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f). Instead of re-deriving answers from raw documents every time, the LLM incrementally builds and maintains a structured wiki — summarizing, cross-referencing, and synthesizing sources into a compounding knowledge artifact.
+
+### Three-layer architecture
+
+| Layer | Owner | Purpose |
+|-------|-------|---------|
+| **Raw sources** | Immutable | Articles, transcripts, PDFs — saved via `wiki_save_source` |
+| **The wiki** | LLM | Synthesized pages — summaries, entity pages, comparisons, explorations |
+| **The schema** | User + LLM | `.wiki.toml` categories, `wiki-conventions.md` behavioral playbook |
+
+### Wiki directory structure
+
+```
+~/my-wiki/
+├── .wiki.toml              # schema: name, categories
+├── wiki-conventions.md     # behavioral playbook (LLM reads this)
+├── index.md                # auto-generated catalog
+├── log.md                  # append-only timeline
+├── sources/                # raw content (immutable)
+└── pages/                  # wiki pages (LLM-maintained)
+```
+
+### Example workflows
+
+**Ingest a URL (LLM-orchestrated via conventions file):**
+```
+User: "Add this to my wiki: https://example.com/article"
+
+LLM:  wiki_read("conventions")                    → loads ingest recipe
+      scrape(url)                                  → raw content + metadata
+      wiki_save_source(content, ...)               → saves to sources/
+      wiki_read("index")                           → current wiki state
+      wiki_write(content, rebuild_index=false)      → intermediate pages
+      wiki_write(content)                          → final page (rebuilds index)
+      wiki_log("ingest | Title | URL\n...")         → appends to log
+```
+
+**Query the wiki:**
+```
+User: "What do my sources say about attention mechanisms?"
+
+LLM:  wiki_read("index")                          → finds relevant pages
+      wiki_search("attention")                     → finds additional matches
+      wiki_read("attention-mechanism")             → reads the page
+      Synthesizes answer, optionally files it back as an "exploration" page
+```
+
+**Lint the wiki:**
+```
+User: "Check my wiki for issues"
+
+LLM:  wiki_list()                                  → all pages with metadata
+      Checks for orphan pages, broken links, stale sources
+      wiki_delete("old-draft")                     → removes orphan pages
+      wiki_log("lint | full scan\n...")             → records findings
+```
+
+### Wiki page frontmatter
+
+Three timestamps track the source, wiki, and page lifecycles:
+
+```yaml
+title: "Attention Mechanism"
+category: concept
+tags: [transformers, deep-learning]
+sources: [sources/2026-05-10_article.md]
+related: [transformers, andrej-karpathy]
+source_date: 2026-05-08     # when the original content was published
+ingested: 2026-05-10        # when added to wiki (immutable)
+updated: 2026-05-17         # when page was last modified
+```
+
+### MCP tools
+
+| Tool | Purpose |
+|------|---------|
+| `wiki_init` | Create wiki scaffold with conventions file |
+| `wiki_save_source` | Save raw content to `sources/` |
+| `wiki_read` | Read pages, sources, index, log, or conventions |
+| `wiki_write` | Create/update pages with frontmatter validation. Use `rebuild_index=false` for batch writes |
+| `wiki_list` | List pages with metadata, optionally filtered by category |
+| `wiki_search` | Full-text search across pages and/or sources |
+| `wiki_log` | Append timestamped entry to the operation log |
+| `wiki_delete` | Delete a page and rebuild the index |
+
+### Customization
+
+The behavioral playbook (`wiki-conventions.md`) is a markdown file the LLM reads during wiki operations. Edit it to change how the LLM categorizes, cross-references, and synthesizes content. Different wikis can have different conventions.
+
+The schema (`.wiki.toml`) defines categories and wiki identity. Default categories: `concept`, `entity`, `summary`, `comparison`, `exploration`, `reference`.
+
+### Obsidian compatibility
+
+The wiki works as an Obsidian vault out of the box — `[[wikilinks]]`, YAML frontmatter, and the directory structure are all native to Obsidian. Open the wiki directory in Obsidian for graph visualization and browsing while the LLM maintains the content via MCP.
 
 ---
 

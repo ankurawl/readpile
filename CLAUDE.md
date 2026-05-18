@@ -4,7 +4,7 @@ Content extraction toolkit for LLMs. Build a personal library from articles, vid
 
 ## MCP Server
 
-readpile exposes 6 tools via MCP (Model Context Protocol):
+readpile exposes 14 tools via MCP (Model Context Protocol):
 
 - **scrape** — Extract article/webpage content from a URL (YAML front matter + markdown)
 - **transcribe** — Transcribe YouTube videos, audio/video URLs, or webpages with embedded YouTube players
@@ -12,6 +12,14 @@ readpile exposes 6 tools via MCP (Model Context Protocol):
 - **batch_scrape** — Scrape multiple URLs in one call with concurrency control. Use `archive_dir` to save all results to disk in one step
 - **archive** — Save content to disk as markdown files
 - **detect_type** — Identify URL type (youtube, rss, blog, audio, video, etc.)
+- **wiki_init** — Create a wiki with directory structure, `.wiki.toml` config, and `wiki-conventions.md`
+- **wiki_save_source** — Save raw content to the wiki's `sources/` directory
+- **wiki_read** — Read a wiki page, source, or special file (index, log, conventions)
+- **wiki_write** — Create or update a wiki page in `pages/` with frontmatter validation
+- **wiki_list** — List all wiki pages with metadata, optionally filtered by category
+- **wiki_search** — Full-text search across pages and/or sources
+- **wiki_log** — Append a timestamped entry to the wiki's operation log
+- **wiki_delete** — Delete a wiki page and rebuild the index
 
 ### crawl tool details
 
@@ -90,6 +98,10 @@ archive < content.md       # Save to disk
 content URL                # Auto-detect and extract
 content URL --archive      # Extract + save to disk
 readpile init              # Generate config file
+readpile wiki init PATH    # Create a wiki
+readpile wiki list         # List wiki pages
+readpile wiki search QUERY # Search wiki pages
+readpile wiki log          # View wiki log
 content-bot start          # Start Telegram bot
 ```
 
@@ -118,11 +130,67 @@ pytest tests/ -v
 
 ```
 src/readpile/
-├── cli/           # Typer CLI commands
+├── cli/           # Typer CLI commands (main.py is the entry point)
 ├── scrapers/      # Article + webpage extraction
 ├── transcribers/  # YouTube + audio transcription
 ├── crawlers/      # RSS, blog, site crawlers
 ├── core/          # Config, models, archiver, detector
 ├── bot/           # Telegram bot
+├── wiki/          # LLMWiki module (models, store)
 └── mcp_server.py  # MCP server (FastMCP)
+```
+
+## LLMWiki
+
+An LLM-maintained wiki layer on top of readpile's content extraction. Inspired by Karpathy's LLMWiki concept — instead of re-deriving answers from raw documents, the LLM incrementally builds a structured wiki that compounds knowledge over time.
+
+### Wiki directory structure
+
+```
+~/my-wiki/
+├── .wiki.toml              # schema: wiki name, categories
+├── wiki-conventions.md     # behavioral playbook for the LLM
+├── index.md                # auto-generated catalog (never edit manually)
+├── log.md                  # append-only timeline of operations
+├── sources/                # raw content (immutable, saved via wiki_save_source)
+└── pages/                  # wiki pages (LLM-created via wiki_write)
+```
+
+### Wiki page frontmatter (three timestamps)
+
+```yaml
+title: "Page Title"
+category: concept           # must be in .wiki.toml categories
+tags: [tag1, tag2]
+sources: [sources/2026-05-10_article.md]
+related: [other-page]
+source_date: 2026-05-08     # when the original content was published
+ingested: 2026-05-10        # when added to wiki (never changes)
+updated: 2026-05-17         # when wiki page was last modified
+```
+
+### Ingest workflow (LLM-orchestrated via conventions file)
+
+```
+scrape(url)                                → raw content
+wiki_save_source(content, title, ...)      → saves to sources/
+wiki_read("index")                         → current wiki state
+wiki_write(content, rebuild_index=false)   → intermediate pages
+wiki_write(content)                        → final page (rebuilds index)
+wiki_log("ingest | Title | URL\n...")      → append-only log entry
+```
+
+### Key design decisions
+
+- **Thin tools + conventions file**: Tools do file I/O; behavioral rules live in `wiki-conventions.md` (editable markdown, not Python code)
+- **Auto-managed index**: `wiki_write` and `wiki_delete` rebuild `index.md` automatically. Pass `rebuild_index=false` for batch writes, `true` on the last one
+- **Append-only log**: `wiki_log` handles date prefix and file append — avoids fragile read-rewrite pattern
+- **`exploration` category**: Query-derived pages use `exploration` to distinguish from source-derived summaries/comparisons
+- **Obsidian compatible**: `[[wikilinks]]`, YAML frontmatter, directory structure all work natively in Obsidian
+
+### Config
+
+```toml
+[wiki]
+default_dir = "~/my-wiki"   # in ~/.readpile/config.toml
 ```

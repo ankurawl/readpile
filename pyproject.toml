@@ -22,6 +22,7 @@ dependencies = [
     "yt-dlp>=2024.1.0",
     "feedparser>=6.0.0",
     "httpx>=0.24.0",
+    "PyYAML>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -52,7 +53,7 @@ scrape = "readpile.cli.scrape:app"
 transcribe = "readpile.cli.transcribe:app"
 archive = "readpile.cli.archive:app"
 content = "readpile.cli.content:app"
-readpile = "readpile.cli.init:app"
+readpile = "readpile.cli.main:app"
 content-bot = "readpile.cli.bot:app"
 readpile-mcp = "readpile.mcp_server:main"
 
