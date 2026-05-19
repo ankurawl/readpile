@@ -102,7 +102,6 @@ readpile wiki init PATH    # Create a wiki
 readpile wiki list         # List wiki pages
 readpile wiki search QUERY # Search wiki pages
 readpile wiki log          # View wiki log
-content-bot start          # Start Telegram bot
 ```
 
 ## ContentItem Format
@@ -135,7 +134,7 @@ src/readpile/
 ├── transcribers/  # YouTube + audio transcription
 ├── crawlers/      # RSS, blog, site crawlers
 ├── core/          # Config, models, archiver, detector
-├── bot/           # Telegram bot
+├── sync/          # Sync pipeline (email, feeds, digest, synthesis)
 ├── wiki/          # LLMWiki module (models, store)
 └── mcp_server.py  # MCP server (FastMCP)
 ```

@@ -31,9 +31,6 @@ audio = [
     "torch>=2.0.0",
     "ffmpeg-python>=0.2.0",
 ]
-bot = [
-    "python-telegram-bot>=20.0",
-]
 mcp = [
     "mcp>=1.2.0",
 ]
@@ -44,7 +41,7 @@ dev = [
     "ruff>=0.1.0",
 ]
 all = [
-    "readpile[audio,bot,mcp]",
+    "readpile[audio,mcp]",
 ]
 
 [project.scripts]
@@ -54,7 +51,6 @@ transcribe = "readpile.cli.transcribe:app"
 archive = "readpile.cli.archive:app"
 content = "readpile.cli.content:app"
 readpile = "readpile.cli.main:app"
-content-bot = "readpile.cli.bot:app"
 readpile-mcp = "readpile.mcp_server:main"
 
 [tool.setuptools.packages.find]

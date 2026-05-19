@@ -341,13 +341,6 @@ readpile wiki log --wiki ~/my-wiki                     # view log
 readpile wiki log --wiki ~/my-wiki --recent 10         # recent entries
 ```
 
-### `content-bot` — Telegram bot
-
-```bash
-content-bot start     # start the bot
-content-bot status    # check if configured
-```
-
 ---
 
 ## Archiving
@@ -360,21 +353,6 @@ By default, content goes to stdout. To add content to your library on disk, use 
 | `content URL --archive` | stdout + save | stdout + save |
 | `content URL --no-archive` | stdout only | stdout only |
 | MCP `archive()` | always saves (explicit call) | always saves |
-
----
-
-## Telegram Bot
-
-An optional Telegram bot — send it any URL and it adds the content to your library. You get back a formatted message plus a downloadable Markdown document.
-
-```bash
-pip install readpile[bot]
-export TELEGRAM_BOT_TOKEN="your-bot-token"
-export ADMIN_CHAT_ID="your-telegram-chat-id"
-content-bot start
-```
-
-Supports `/set_language`, `/set_style brief|detailed`, `/history`, and admin whitelist commands.
 
 ---
 
@@ -412,7 +390,6 @@ default_dir = ""                      # default wiki directory for MCP tools
 | Environment Variable | Description |
 |---------------------|-------------|
 | `HF_TOKEN` | HuggingFace token for speaker diarization |
-| `TELEGRAM_BOT_TOKEN` | Telegram bot token |
 | `READPILE_CONFIG` | Override config file path |
 | `YOUTUBE_COOKIES` | Path to a Netscape cookie file for YouTube (see [YouTube IP Blocks](#youtube-ip-blocks)) |
 
@@ -453,7 +430,6 @@ YouTube's caption API blocks requests that don't come from a recognized browser 
 ```bash
 pip install readpile               # base: scraping, crawling, YouTube transcription
 pip install readpile[audio]        # + Whisper transcription (torch, ffmpeg-python)
-pip install readpile[bot]          # + Telegram bot
 pip install readpile[mcp]          # + MCP server for LLM integration
 pip install readpile[all]          # everything
 pip install readpile[dev]          # + test/lint tools
@@ -497,7 +473,6 @@ src/readpile/
 ├── transcribers/    # YouTube captions + Whisper audio transcription
 ├── crawlers/        # RSS, blog, and site URL discovery
 ├── core/            # Config, models, archiver, URL detector, robots.txt
-├── bot/             # Telegram bot
 ├── wiki/            # LLMWiki module (models.py, store.py)
 └── mcp_server.py    # MCP server (FastMCP)
 ```

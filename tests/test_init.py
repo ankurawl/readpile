@@ -25,7 +25,6 @@ class TestConfigTemplate:
         assert "[transcribe]" in rendered
         assert "[scrape]" in rendered
         assert "[crawl]" in rendered
-        assert "[bot]" in rendered
 
     def test_auto_archive_true(self):
         rendered = _CONFIG_TEMPLATE.format(output_dir="~/my-output", auto_archive="true")

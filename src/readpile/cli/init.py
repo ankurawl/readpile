@@ -34,11 +34,6 @@ rate_limit = 1.0
 [crawl]
 max_depth = 10
 max_pages = 100
-
-[bot]
-# Telegram token via env: TELEGRAM_BOT_TOKEN
-whitelist_file = "~/.readpile/whitelist.json"
-preferences_file = "~/.readpile/preferences.json"
 """
 
 

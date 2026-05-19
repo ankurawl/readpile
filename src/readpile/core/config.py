@@ -31,11 +31,7 @@ DEFAULTS: dict = {
         "max_depth": 10,
         "max_pages": 100,
     },
-    "bot": {
-        "whitelist_file": "~/.readpile/whitelist.json",
-        "preferences_file": "~/.readpile/preferences.json",
-    },
-    "wiki": {
+"wiki": {
         "default_dir": "",
     },
 }
@@ -46,7 +42,6 @@ DEFAULTS: dict = {
 
 ENV_MAP: dict[str, tuple[str, ...]] = {
     "HF_TOKEN": ("transcribe", "hf_token"),
-    "TELEGRAM_BOT_TOKEN": ("bot", "token"),
 }
 
 # ---------------------------------------------------------------------------
