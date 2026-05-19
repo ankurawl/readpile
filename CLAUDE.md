@@ -193,3 +193,74 @@ wiki_log("ingest | Title | URL\n...")      → append-only log entry
 [wiki]
 default_dir = "~/my-wiki"   # in ~/.readpile/config.toml
 ```
+
+## Sync Pipeline
+
+Automated content collection and knowledge synthesis via email and RSS feeds.
+
+### Commands
+
+```
+readpile sync              # Check email + feeds, send daily digest
+readpile sync --no-email   # Feeds only
+readpile sync --no-feeds   # Email only
+readpile sync --dry-run    # Preview without saving
+readpile sync --reset-feeds # Clear feed state, re-process
+readpile synthesize --pending  # Synthesize approved items (cron)
+readpile synthesize --all     # Synthesize everything
+readpile synthesize --source PATH  # Specific source
+readpile sources add URL      # Add feed source (auto-detect)
+readpile sources list         # List all sources
+readpile sources remove NAME  # Remove source
+readpile sources enable NAME  # Re-enable disabled source
+readpile status               # Show sync overview
+```
+
+### Architecture
+
+Sync reuses existing extraction/transcription code — no logic is duplicated:
+- `scrape_url()`, `scrape_article()` for articles
+- `transcribe_youtube()` for video
+- `crawl_rss_detailed()` for feed discovery
+- `WikiStore.save_source_from_item()` for wiki storage
+
+The sync module (`src/readpile/sync/`) contains:
+- `pipeline.py` — async orchestrator (email → feeds → save → digest)
+- `synthesizer.py` — LLM wiki page creation with quality gate
+- `state.py` — JSON-backed state tracking + lock file
+- `sources.py` — source registry (reads/writes sources.toml)
+- `feeds.py` — feed crawling with rate limiting
+- `digest.py` — topic grouping (LLM) + email sending
+- `reply.py` — parse user replies to digest emails
+- `llm.py` — LLM calls via OpenAI-compatible API
+- `urls.py` — URL normalization for dedup
+- `email/` — Gmail OAuth provider + content extraction
+
+### Config
+
+```toml
+[llm]
+provider = "claude"
+model = "claude-sonnet-4-6"
+# API key via env: READPILE_LLM_API_KEY
+
+[sync]
+synthesis_wait_days = 7
+max_auto_synthesize_per_run = 20
+
+[sync.email]
+enabled = true
+provider = "gmail"
+account = "readpile-inbox@gmail.com"
+
+[sync.digest]
+enabled = true
+to = "personal@email.com"
+# SMTP password via env: READPILE_SMTP_PASSWORD
+```
+
+Sources are stored separately in `~/.readpile/sources.toml` (machine-managed via `readpile sources` commands).
+
+### Security
+
+All secrets via env vars only (`READPILE_LLM_API_KEY`, `READPILE_SMTP_PASSWORD`). OAuth credentials stored in `~/.readpile/` with chmod 600. No secrets in config files.

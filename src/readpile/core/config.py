@@ -31,8 +31,41 @@ DEFAULTS: dict = {
         "max_depth": 10,
         "max_pages": 100,
     },
-"wiki": {
+    "wiki": {
         "default_dir": "",
+    },
+    "llm": {
+        "provider": "claude",
+        "model": "claude-sonnet-4-6",
+    },
+    "sync": {
+        "state_file": "~/.readpile/sync-state.json",
+        "log_file": "~/.readpile/sync.log",
+        "synthesis_wait_days": 7,
+        "synthesis_window_days": 90,
+        "max_auto_synthesize_per_run": 20,
+        "max_initial_entries": 20,
+        "max_consecutive_failures": 7,
+        "max_email_size_bytes": 5242880,
+        "email": {
+            "enabled": False,
+            "provider": "gmail",
+            "account": "",
+            "credentials_file": "~/.readpile/email-credentials.json",
+            "labels": ["INBOX"],
+            "max_age_days": 7,
+            "skip_synthesis_senders": [],
+        },
+        "digest": {
+            "enabled": False,
+            "to": "",
+            "from": "",
+            "smtp_host": "smtp.gmail.com",
+            "smtp_port": 587,
+            "max_topic_files": 5,
+            "max_pending_digests": 7,
+            "wiki_health_day": "saturday",
+        },
     },
 }
 
@@ -42,6 +75,8 @@ DEFAULTS: dict = {
 
 ENV_MAP: dict[str, tuple[str, ...]] = {
     "HF_TOKEN": ("transcribe", "hf_token"),
+    "READPILE_LLM_API_KEY": ("llm", "api_key"),
+    "READPILE_SMTP_PASSWORD": ("sync", "digest", "smtp_password"),
 }
 
 # ---------------------------------------------------------------------------

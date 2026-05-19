@@ -20,7 +20,7 @@ filename_max_length = 80
 
 [transcribe]
 engine = "auto"
-whisper_model = "base"
+whisper_model = "{whisper_model}"
 diarize = false
 # HuggingFace token via env: HF_TOKEN
 # YouTube cookies for bypassing IP bans (see README for setup):
@@ -35,6 +35,51 @@ rate_limit = 1.0
 max_depth = 10
 max_pages = 100
 """
+
+_LLM_TEMPLATE = """\
+
+[llm]
+provider = "{llm_provider}"
+model = "{llm_model}"
+# API key via env: READPILE_LLM_API_KEY
+"""
+
+_SYNC_TEMPLATE = """\
+
+[sync]
+state_file = "~/.readpile/sync-state.json"
+log_file = "~/.readpile/sync.log"
+synthesis_wait_days = 7
+max_auto_synthesize_per_run = 20
+max_initial_entries = 20
+max_consecutive_failures = 7
+
+[sync.email]
+enabled = {email_enabled}
+provider = "{email_provider}"
+account = "{email_account}"
+credentials_file = "~/.readpile/email-credentials.json"
+labels = ["INBOX"]
+max_age_days = 7
+skip_synthesis_senders = []
+
+[sync.digest]
+enabled = {digest_enabled}
+to = "{digest_to}"
+from = "{digest_from}"
+smtp_host = "smtp.gmail.com"
+smtp_port = 587
+max_topic_files = 5
+max_pending_digests = 7
+wiki_health_day = "saturday"
+# SMTP password via env: READPILE_SMTP_PASSWORD
+"""
+
+_LLM_MODELS = {
+    "claude": "claude-sonnet-4-6",
+    "openai": "gpt-4o",
+    "ollama": "llama3",
+}
 
 
 @app.command()
@@ -58,12 +103,22 @@ def init() -> None:
     output_dir = typer.prompt(
         "Output directory (when archiving)", default="~/readpile-output"
     )
+    whisper_model = typer.prompt(
+        "Whisper model for podcast transcription (medium/large)",
+        default="medium",
+    )
 
     config_dir.mkdir(parents=True, exist_ok=True)
+    import os, stat
+    try:
+        os.chmod(config_dir, stat.S_IRWXU)
+    except OSError:
+        pass
 
     content = _CONFIG_TEMPLATE.format(
         output_dir=output_dir,
         auto_archive=str(auto_archive).lower(),
+        whisper_model=whisper_model,
     )
 
     wiki_dir = typer.prompt(
@@ -74,9 +129,51 @@ def init() -> None:
     if wiki_dir:
         content += f'\n[wiki]\ndefault_dir = "{wiki_dir}"\n'
 
+    # LLM provider
+    llm_provider = typer.prompt(
+        "LLM provider (claude/openai/ollama)",
+        default="claude",
+    )
+    llm_model = _LLM_MODELS.get(llm_provider, "claude-sonnet-4-6")
+    content += _LLM_TEMPLATE.format(llm_provider=llm_provider, llm_model=llm_model)
+    if llm_provider != "ollama":
+        typer.echo("  → Set env var READPILE_LLM_API_KEY with your API key")
+
+    # Email provider
+    email_provider = typer.prompt(
+        "Email provider (gmail/skip)",
+        default="skip",
+    )
+    email_enabled = email_provider != "skip"
+    email_account = ""
+    digest_to = ""
+    digest_from = ""
+
+    if email_enabled:
+        email_account = typer.prompt("Readpile email account (e.g. readpile-inbox@gmail.com)")
+        digest_to = typer.prompt("Personal email (for digests)")
+        digest_from = email_account
+        typer.echo("  → Set env var READPILE_SMTP_PASSWORD with Gmail app password")
+        typer.echo("    (requires 2FA enabled, then generate an App Password)")
+
+    content += _SYNC_TEMPLATE.format(
+        email_enabled=str(email_enabled).lower(),
+        email_provider=email_provider if email_enabled else "gmail",
+        email_account=email_account,
+        digest_enabled=str(email_enabled).lower(),
+        digest_to=digest_to,
+        digest_from=digest_from,
+    )
+
     config_path.write_text(content, encoding="utf-8")
 
+    # Create empty sources.toml
+    sources_path = config_dir / "sources.toml"
+    if not sources_path.exists():
+        sources_path.write_text("# Feed sources — managed by `readpile sources`\n", encoding="utf-8")
+
     typer.echo(f"Config written to {config_path}")
+    typer.echo("  ⚠ Add ~/.readpile/ to your .gitignore if you keep dotfiles in git")
 
 
 if __name__ == "__main__":

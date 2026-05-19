@@ -296,6 +296,18 @@ class WikiStore:
         archiver = Archiver(self.sources_dir)
         return archiver.save(item)
 
+    def save_source_from_item(self, item: "ContentItem") -> Path:
+        """Save a ContentItem to sources/ with automatic type conversions."""
+        from readpile.core.models import ContentItem
+        return self.save_source(
+            content=item.text,
+            title=item.title,
+            source_url=item.source_url,
+            content_type=item.content_type.value,
+            date=item.date.isoformat() if item.date else None,
+            author=item.author,
+        )
+
     def list_pages(self, category: str | None = None) -> list[dict]:
         if not self.pages_dir.exists():
             return []
