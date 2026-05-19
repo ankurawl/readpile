@@ -9,13 +9,14 @@ from readpile.core.config import load_config, get_config_path, DEFAULTS
 # --- Defaults ---
 
 
-def test_defaults():
+def test_defaults(monkeypatch, tmp_path):
+    monkeypatch.setenv("READPILE_CONFIG", str(tmp_path / "nonexistent.toml"))
     config = load_config()
     assert config["general"]["auto_archive"] is False
     assert config["scrape"]["headless"] is True
     assert config["transcribe"]["engine"] == "auto"
     assert config["crawl"]["max_depth"] == 10
-    assert config["wiki"]["default_dir"] == ""
+    assert config["wiki"]["default_dir"] == "~/my-wiki"
     assert "summarize" not in config
 
 

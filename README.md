@@ -1,504 +1,383 @@
 # readpile
 
-**Your personal library for the modern web.** Collect articles, transcribe videos, crawl entire blogs — then search, shortlist, and revisit anything on your own terms. Use it from the command line, or let your LLM curate your library directly via MCP.
+**Collect anything from the web. Let your LLM turn it into a knowledge base that grows smarter over time.**
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)]()
-[![Tests](https://img.shields.io/badge/tests-335%20passing-brightgreen.svg)]()
 
 ---
 
 ## What is readpile?
 
-The best content on the web is scattered across blogs, YouTube channels, podcasts, and documentation sites. readpile brings it all into one place — your personal library. Collect anything worth keeping, search across everything you've saved, and come back to it whenever you're ready.
+You follow dozens of sources — conference talks, newsletters, technical blogs, podcast episodes, reference docs. The problem isn't finding content. It's that nothing compounds. You read an article, forget where you saw it, re-derive the same conclusions next month, and never build on what you've already consumed.
 
-**The problem it solves:** You follow dozens of sources — conference talks, newsletters, technical blogs, podcast episodes, reference docs. Keeping up means clicking through pages, waiting for videos, copying text, and losing track of what you've already consumed. readpile handles the collecting so you can focus on the reading — catch up when you have time, skim what matters, save the rest for later.
+readpile fixes this. It extracts content from anywhere on the web — articles, videos, podcasts, documentation sites — and feeds it into an LLM-maintained wiki that accumulates knowledge over time. Cross-references are built automatically. Contradictions between sources are flagged. Your explorations compound: good answers get filed back as new wiki pages, so future questions benefit from past ones.
 
-### What you can do with it
+Humans abandon wikis because the maintenance burden grows faster than the value. LLMs don't get bored, don't forget to update a cross-reference, and can touch 15 files in one pass. Your job is to curate sources, direct the analysis, and ask good questions. The LLM handles the bookkeeping.
 
-- **Build your library** — Collect articles, transcripts, and documentation into a personal archive you own. Search across everything, revisit old reads, and keep a growing reference collection that's always available.
-- **Build a knowledge wiki** — Let your LLM synthesize collected content into a persistent, cross-referenced wiki that compounds knowledge over time. Inspired by [Karpathy's LLMWiki concept](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
-- **Catch up on your terms** — Pull the last 10 posts from a blog, 5 episodes from a podcast, or a full YouTube playlist. Skim now, read deeply later, or save as reference material — your schedule, your pace.
-- **Create custom digests** — Combine content from multiple sources into a single briefing. Shortlist the pieces that matter, summarize the rest, and start your day already caught up.
-- **Give your LLM eyes and ears** — Connect readpile as an MCP server and your AI assistant can read any webpage, watch any YouTube video, or crawl any site — then help you search, compare, and make sense of it all.
-- **Research at scale** — Crawl an entire documentation site or blog archive. Search across hundreds of pages locally, pull out what's relevant, and build a focused reference collection for any project.
-
-### What it can extract
-
-| Source | What you get |
-|--------|-------------|
-| **Blog posts & articles** | Clean Markdown with title, author, date, tags — extracted from the rendered page |
-| **YouTube videos** | Full transcript with timestamps, via YouTube's caption API (instant, free) |
-| **YouTube channels** | Discover recent videos from any channel (`@handle`, `/channel/ID`) via RSS |
-| **Podcasts** | Auto-discover podcast RSS feeds, get episode metadata, transcribe episodes |
-| **Audio & video files** | Whisper-powered transcription with optional speaker diarization |
-| **RSS/Atom feeds** | All entry URLs with optional metadata (title, date, description, audio URLs) |
-| **Documentation sites** | Recursive crawl that discovers every page under a URL prefix |
-| **Any webpage** | Headless Chromium rendering + intelligent content extraction (HTTP fallback when Chromium unavailable) |
+readpile is the plumbing that makes this work — content extraction, feed monitoring, email-driven collection, and a wiki toolkit — all exposed as both CLI commands and MCP tools that any LLM can use.
 
 ### How it fits together
 
 ```
-                          ┌─────────┐
-                     ┌───→│ scrape  │───→ article text
-                     │    └─────────┘
-  ┌───────┐    ┌─────┴──┐ ┌───────────┐
-  │ crawl │───→│  URLs  │→│transcribe │───→ transcript
-  └───────┘    └─────┬──┘ └───────────┘
-                     │    ┌─────────┐        ┌─────────┐
-                     └───→│ content │───────→│ archive │───→ Markdown files
-                          └─────────┘        └─────────┘
-                          (auto-detect)
+ COLLECT                    EXTRACT                    STORE
+────────────────────────────────────────────────────────────────
+ email inbox ──┐             ┌── scrape ───┐          source files
+ RSS feeds ────┤             │             │          (raw content)
+ YouTube ──────┼── sync ─────┼─ transcribe ┼────→         │
+ podcasts ─────┤   or manual │             │          wiki pages
+ URLs ─────────┘             └── crawl ────┘          (synthesized)
 ```
 
-Every piece of content becomes a **ContentItem** — a Markdown document with YAML front matter — that pipes cleanly between commands, works with any Markdown viewer, and is easy for LLMs to parse. Think of each one as a book on your shelf:
+**Collect** from any source — email newsletters, RSS feeds, YouTube channels, podcasts, or individual URLs. The sync pipeline automates collection; you can also use CLI commands or MCP tools directly.
 
-```markdown
----
-title: "How to Build CLI Tools"
-source_url: https://example.com/post
-content_type: article
-date: 2026-04-25
-author: "Jane Doe"
-word_count: 2400
+**Extract** content using the right tool for the job — `scrape` for articles, `transcribe` for video/audio, `crawl` to discover URLs from feeds and sites.
+
+**Store** as source files (raw extracted content, immutable) and wiki pages (LLM-synthesized, cross-referenced, continuously updated).
+
 ---
 
-The full article text in clean Markdown...
-```
+## Design Philosophy
+
+**Content extraction has no built-in LLM.** Scraping, transcription, crawling, and wiki file I/O are pure code — no API keys needed, works with any MCP client. The sync pipeline is the exception: it calls an LLM API directly for automated digest grouping and wiki synthesis, so it does require an API key.
+
+**Thin tools + conventions file.** The wiki tools handle file I/O and validation, not workflow orchestration. Behavioral rules — how to categorize, cross-reference, and synthesize — live in `wiki-conventions.md`, a markdown file the LLM reads as a prompt. Changing wiki behavior means editing markdown, not Python. Different wikis can have different conventions.
+
+**Two modes of operation.** For interactive use, MCP tools let your LLM orchestrate the full workflow — scrape, save, synthesize, cross-reference — guided by the conventions file. For hands-off use, the sync pipeline automates collection and synthesis on a schedule, driven entirely through email.
+
+**Three timestamps on wiki pages.** `source_date` is when the original content was published. `ingested` is when you added it to the wiki. `updated` is when the wiki page was last revised. Without `source_date`, all information gets flattened into a timeless present — the LLM can't distinguish a 2024 claim from a 2026 one.
 
 ---
 
 ## Quick Start
 
-### Install
+### 1. Install
 
 ```bash
-pip install readpile
-python -m playwright install chromium    # needed for web scraping
+git clone https://github.com/ankurawl/readpile.git
+cd readpile
+pip install -e ".[all]"                         # everything: scraping, MCP, sync, audio
+python -m playwright install chromium           # one-time: downloads the browser for web scraping
 ```
 
-### Use from the command line
+For audio/video transcription (podcasts, local files), also install ffmpeg:
 
 ```bash
-# Extract content from any URL (auto-detects type)
-content https://youtube.com/watch?v=dQw4w9WgXcQ
-content https://example.com/blog/post
-
-# Scrape a single article
-scrape https://example.com/blog/great-post
-
-# Transcribe a YouTube video
-transcribe https://youtube.com/watch?v=dQw4w9WgXcQ
-
-# Crawl a blog and archive every post
-crawl https://example.com/blog | scrape --batch | archive --dir ./blog-archive/
-
-# Extract and save to disk
-content https://example.com/post --archive
+brew install ffmpeg       # macOS
+# apt install ffmpeg      # Linux
 ```
 
-### Use from an LLM (via MCP)
-
-readpile ships as an [MCP server](https://modelcontextprotocol.io/) that any compatible LLM client can discover and use. Once connected, your LLM becomes a librarian — it can collect pages, transcribe videos, crawl sites, and archive content into your library, then help you read, compare, or make sense of what you've gathered.
-
-**Claude Code (repo-local)** — auto-configured via `.mcp.json` at the repo root:
+If you only need specific features:
 
 ```bash
-pip install readpile[mcp]
-python -m playwright install chromium
-# Claude Code discovers the server automatically when launched from this directory
+pip install -e "."              # base: scraping, crawling, YouTube transcription
+pip install -e ".[mcp]"         # + MCP server for LLM integration
+pip install -e ".[sync]"        # + sync pipeline (email, feeds, digest, synthesis)
+pip install -e ".[audio]"       # + Whisper transcription (torch, ffmpeg-python)
 ```
+
+### 2. Try it (zero config)
+
+These work immediately — no setup needed. Wrap URLs in quotes to avoid shell issues with `?` and `&` characters:
+
+```bash
+scrape "https://example.com/blog/post"        # extract an article as markdown
+transcribe "https://youtube.com/watch?v=..."   # get a full transcript
+crawl "https://example.com/blog"               # discover all post URLs
+content "https://example.com/post" --archive   # auto-detect, extract, and save to disk
+```
+
+### 3. Set up your library
+
+Before running `readpile init`, have these ready:
+
+| What                                                                                                   | Why                                                            | Required?                               |
+| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- | --------------------------------------- |
+| A wiki directory path (e.g. `~/my-wiki`)                                                               | Where your knowledge base lives                                | Yes                                     |
+| An LLM API key ([Anthropic](https://console.anthropic.com/) or [OpenAI](https://platform.openai.com/)) | Powers digest grouping and wiki synthesis in the sync pipeline | Yes, unless using Ollama                |
+| A dedicated Gmail address (e.g. `readpile-inbox@gmail.com`)                                            | Collects newsletters and forwarded links                       | No — only if you want email-driven sync |
+| A [Gmail App Password](https://myaccount.google.com/apppasswords) for that Gmail account               | Lets readpile send you digest emails from the readpile inbox   | No — only if you enable email           |
+| [Gmail OAuth credentials](https://console.cloud.google.com/) (JSON file)                               | Lets readpile read that inbox                                  | No — only if you enable email           |
+
+```bash
+readpile init
+```
+
+This walks you through configuration interactively. The init command prints next steps when it finishes, including the exact env vars to set. You can re-run `readpile init` at any time to change your settings.
+
+After init, create your wiki and add subscriptions:
+
+```bash
+readpile wiki init ~/my-wiki --name "AI Research"
+
+readpile sources add "https://blog.example.com"        # auto-detects RSS feed
+readpile sources add "https://youtube.com/@3blue1brown" # YouTube channel
+readpile sources add "https://acquired.fm"              # podcast
+```
+
+### Set environment variables
+
+Add these to your shell profile (`~/.zshrc` or `~/.bashrc`) so they persist across sessions:
+
+```bash
+# Required for sync pipeline (digest grouping + wiki synthesis)
+export READPILE_LLM_API_KEY='your-api-key'
+
+# Only if you enabled email — this is the Gmail App Password for
+# the READPILE inbox (e.g. readpile-inbox@gmail.com), NOT your
+# personal email. It lets readpile send digest emails from that account.
+# Paste the 16 characters with or without spaces — both formats work.
+export READPILE_SMTP_PASSWORD='your-gmail-app-password'
+```
+
+Then reload: `source ~/.zshrc`
+
+### 4. Connect to your LLM
+
+readpile ships as an [MCP server](https://modelcontextprotocol.io/) so any compatible LLM can use its tools directly.
 
 **Claude Code (global — available from any directory):**
 
 ```bash
-# 1. Install readpile globally
-pip install readpile[mcp]
-python -m playwright install chromium
-
-# 2. Add to Claude Code as a global MCP server (pick one):
-
-# Option A: Use the claude CLI
 claude mcp add --scope user readpile -- readpile-mcp
-
-# Option B: Manually edit ~/.claude.json
-#   Find the "mcpServers" section and add:
-#   "readpile": {
-#     "command": "readpile-mcp",
-#     "args": [],
-#     "env": {},
-#     "type": "stdio"
-#   }
 ```
 
-**Other MCP clients** — add to your client's MCP configuration:
+**Claude Code (repo-local):** auto-configured via `.mcp.json` at the repo root.
+
+**Other MCP clients:**
 
 ```json
 {
   "mcpServers": {
-    "readpile": {
-      "command": "readpile-mcp",
-      "args": [],
-      "type": "stdio"
-    }
+    "readpile": { "command": "readpile-mcp", "args": [], "type": "stdio" }
   }
 }
 ```
 
-Available MCP tools:
+### 5. Automate
 
-| MCP Tool | What it does |
-|----------|-------------|
-| `scrape(url)` | Extract article/webpage content as Markdown |
-| `transcribe(source, language, fallback_url)` | Transcribe YouTube, audio/video URLs, or webpages with embedded YouTube. Use `fallback_url` for podcast episodes where audio needs ffmpeg but the webpage has a YouTube embed |
-| `crawl(url, mode, recent, limit, metadata)` | Discover content URLs from feeds, blogs, sites, YouTube channels, or podcasts |
-| `batch_scrape(urls, concurrency, archive_dir)` | Scrape multiple URLs in one call with concurrency control. Use `archive_dir` to save all results to disk |
-| `archive(content, title, source_url, date, author, dir)` | Save content to disk as a Markdown file |
-| `detect_type(url)` | Identify URL type (youtube, youtube_channel, rss, blog, audio, etc.) |
-| `wiki_init(path, name, ...)` | Create a wiki with directory structure, config, and conventions |
-| `wiki_save_source(content, ...)` | Save raw content to the wiki's `sources/` directory |
-| `wiki_read(page, ...)` | Read a wiki page, source, or special file (index, log, conventions) |
-| `wiki_write(content, ...)` | Create or update a wiki page with frontmatter validation |
-| `wiki_list(...)` | List all wiki pages with metadata |
-| `wiki_search(query, ...)` | Full-text search across pages and/or sources |
-| `wiki_log(entry, ...)` | Append a timestamped entry to the wiki log |
-| `wiki_delete(page, ...)` | Delete a wiki page and rebuild the index |
+Schedule two cron jobs and you're done — everything else happens through email:
 
-The `crawl` tool supports these modes:
+```bash
+crontab -e
+# 0 8  * * *  readpile sync                  # morning: collect + send digest
+# 0 20 * * *  readpile synthesize --pending   # evening: build wiki pages
+```
+
+Each morning, `readpile sync` checks your email inbox and subscriptions for new content, saves source files to the wiki, and sends you a digest email. Reply to the digest to approve or skip synthesis. Each evening, `readpile synthesize` turns approved items into wiki pages.
+
+---
+
+## Tools
+
+Every capability is available both as a CLI command and as an MCP tool. The CLI is useful for shell scripts and one-off tasks. The MCP tools let your LLM use readpile directly.
+
+### Content extraction
+
+| Capability | CLI | MCP | Description |
+|------------|-----|-----|-------------|
+| Extract articles | `scrape URL` | `scrape(url)` | Clean markdown from any webpage. Headless Chromium with readability heuristics, HTTP fallback |
+| Transcribe | `transcribe URL` | `transcribe(source, language, fallback_url)` | YouTube captions (instant) or Whisper for audio/video. `fallback_url` checks for YouTube embeds when audio fails |
+| Discover URLs | `crawl URL` | `crawl(url, mode, recent, limit, metadata)` | Find content from RSS feeds, blogs, sites, YouTube channels, or podcasts |
+| Detect type | — | `detect_type(url)` | Identify URL type: youtube, rss, blog, audio, etc. |
+| Auto-detect | `content URL` | — | Detect URL type and route to scrape or transcribe automatically |
+| Batch scrape | — | `batch_scrape(urls, concurrency, archive_dir)` | Scrape multiple URLs in one call. Use `archive_dir` to save all results to disk |
+| Save to disk | `archive < content.md` | `archive(content, title, source_url, dir)` | Save content as `YYYY-MM-DD_title-slug.md` |
+
+### Wiki
+
+| Capability | CLI | MCP | Description |
+|------------|-----|-----|-------------|
+| Create wiki | `readpile wiki init PATH` | `wiki_init(path, name, ...)` | Create directory structure, config, and conventions file |
+| Save source file | — | `wiki_save_source(content, title, ...)` | Save raw content to the wiki's `sources/` directory |
+| Read | — | `wiki_read(page)` | Read a wiki page, source file, index, log, or conventions |
+| Write | — | `wiki_write(content, page, rebuild_index)` | Create or update a wiki page with frontmatter validation |
+| List pages | `readpile wiki list` | `wiki_list(category)` | List all wiki pages with metadata |
+| Search | `readpile wiki search QUERY` | `wiki_search(query, scope)` | Full-text search across pages and/or source files |
+| Log | `readpile wiki log` | `wiki_log(entry)` | Append a timestamped entry to the operation log |
+| Delete | — | `wiki_delete(page)` | Delete a wiki page and rebuild the index |
+
+### Sync pipeline
+
+| Capability | CLI | Description |
+|------------|-----|-------------|
+| Sync | `readpile sync` | Check email + subscriptions, save source files, send digest |
+| Synthesize | `readpile synthesize --pending` | LLM-powered wiki page creation from approved source files |
+| Add subscription | `readpile sources add URL` | Auto-detect type and add a feed subscription |
+| List subscriptions | `readpile sources list` | Show all subscriptions with status |
+| Remove subscription | `readpile sources remove NAME` | Remove a subscription by name |
+| Enable subscription | `readpile sources enable NAME` | Re-enable a disabled subscription |
+| Status | `readpile status` | Overview: last sync, pending count, subscription health |
+
+### Crawl modes
+
+The `crawl` tool supports multiple discovery modes:
 
 | Mode | What it does |
 |------|-------------|
 | `auto` | Auto-detect the best mode from the URL |
-| `rss` | Parse RSS/Atom feeds. Auto-discovers feeds from non-feed URLs. Use `metadata=True` to get JSON with titles, dates, descriptions |
+| `rss` | Parse RSS/Atom feeds. Auto-discovers feeds from non-feed URLs. Use `metadata=True` for JSON with titles, dates, descriptions |
 | `podcast` | Auto-discover podcast RSS feed from any URL, filter to audio-only episodes |
 | `youtube` | Resolve YouTube channel URLs to their RSS feed, return recent videos |
-| `blog` | Discover blog post URLs via Playwright or HTTP fallback |
+| `blog` | Discover blog post URLs via Playwright or HTTP fallback. Returns alphabetical order; use `rss` for date-sorted |
 | `site` | Recursive site crawl under a URL prefix |
 
 ---
 
 ## Example Workflows
 
-### Morning briefing from multiple sources
+### Add an article to your wiki
+
+```
+You:  "Add this to my wiki: https://example.com/how-attention-works"
+
+LLM:  [reads wiki conventions]
+      [scrapes the article → gets title, author, date, full text]
+      [saves to sources/2026-05-19_how-attention-works.md]
+      [reads wiki index → finds related pages: transformers.md, neural-networks.md]
+      [creates pages/attention-mechanism.md with cross-references]
+      [updates pages/transformers.md with new "Attention" section]
+      [logs: "ingest | How Attention Works | example.com"]
+
+Done — created attention-mechanism.md and updated transformers.md.
+```
+
+### Query your wiki
+
+```
+You:  "What do my sources say about the differences between GPT and BERT?"
+
+LLM:  [reads wiki index → finds gpt.md, bert.md, transformers.md]
+      [searches for "GPT BERT" → finds 2 more relevant pages]
+      [reads all 5 pages, synthesizes comparison]
+
+GPT and BERT differ in three key ways: [answer based on your wiki]...
+
+      [files answer back as pages/gpt-vs-bert.md with category "exploration"]
+```
+
+### Catch up via email
+
+```
+ 8:00 AM  readpile sync runs via cron
+          → checks your email inbox (2 newsletters arrived overnight)
+          → crawls your 5 RSS subscriptions (3 new posts)
+          → transcribes 1 new YouTube video from a subscribed channel
+          → sends you a digest email: "readpile — May 19 (6 new items)"
+
+10:30 AM  You read the digest on your phone and reply:
+          "Synthesize items 1, 3, and 5. Skip item 2.
+           Add https://newblog.com to my subscriptions."
+
+ 8:00 PM  readpile synthesize runs via cron
+          → processes your reply: marks 1, 3, 5 for synthesis, skips 2
+          → adds newblog.com as an RSS subscription
+          → reads each source file, compares against existing wiki
+          → creates 2 new wiki pages, updates 1 existing page
+          → skips item 5 (redundant with existing pages/ml-training.md)
+```
+
+### Archive an entire blog
+
+```
+You:  "Save every post from blog.example.com to my wiki"
+
+LLM:  [crawls blog.example.com, mode=rss → discovers RSS feed]
+      [finds 47 posts with titles, dates, authors]
+      [batch_scrape all 47 URLs → saves each to sources/]
+      [logs: "bulk ingest | blog.example.com | 47 source files saved"]
+
+Saved 47 posts to sources/. They'll appear in your next digest,
+or I can start synthesizing them into wiki pages now.
+```
+
+### Search across everything
+
+```
+You:  "Search my wiki for anything about backpropagation"
+
+LLM:  [wiki_search("backpropagation", scope="all")]
+      Found 3 results:
+      - pages/backpropagation.md — "Backpropagation" [concept]
+        Line 12: "...the chain rule applied recursively through layers..."
+      - pages/neural-network-training.md — "Neural Network Training" [summary]
+        Line 28: "...backpropagation computes gradients for each weight..."
+      - sources/2026-05-10_karpathy-lecture.md
+        Line 145: "...backprop is just repeated application of the chain rule..."
+```
+
+### Crawl with a login session
+
+The `crawl` CLI supports a `--login` flag that opens a visible browser window so you can log in manually. The crawl then runs with your authenticated session:
 
 ```bash
-# Collect today's reading from 3 blogs + a podcast into one folder
-{
-  crawl https://blog-a.com/feed.xml --recent 3 | scrape --batch
-  crawl https://blog-b.com/blog | scrape --batch
-  transcribe https://youtube.com/watch?v=latest-talk
-} | archive --batch --dir ./daily-briefing/
-# Then ask your LLM: "Summarize today's briefing into 5 bullet points"
+crawl https://members.example.com/blog --login
+# Opens Chrome → you log in → crawl discovers URLs with your session
 ```
 
-### Save a blog before it disappears
-
-```bash
-crawl https://closing-soon.com/blog | scrape --batch | archive --dir ./saved-blog/
-# Every post preserved as YYYY-MM-DD_title-slug.md with full metadata
-```
-
-### Build a research library
-
-```bash
-# Crawl docs, grab relevant videos, pull it all into one folder
-crawl https://docs.example.com --mode site --depth 3 | scrape --batch | archive --dir ./research/
-transcribe https://youtube.com/watch?v=related-talk | archive --dir ./research/
-# Your research library — instantly searchable, LLM-ready
-```
-
-### Catch up on a podcast
-
-```bash
-crawl https://podcast.com/feed.xml --recent 5
-# Returns 5 episode URLs — pipe to transcribe, then read at your own pace
-```
-
-### Catch up on a YouTube channel
-
-Using MCP, your LLM can discover and transcribe recent videos from any YouTube channel:
-
-```
-crawl("youtube.com/@channelname", recent=5)  → 5 most recent video URLs
-transcribe(video_url)                        → full transcript via YouTube captions
-archive(content, title, source_url)          → save to your library
-```
-
-### Discover and summarize a podcast
-
-Using MCP, your LLM can find podcast episodes and get structured metadata in one call:
-
-```
-crawl("newsletter.com/podcast", mode="podcast", recent=10)
-  → auto-discovers RSS feed, filters to audio episodes
-  → returns JSON with title, date, description, audio URL, duration per episode
-
-transcribe(episode_url)
-  → if episode page has an embedded YouTube player, transcribes via captions (no ffmpeg needed)
-
-transcribe(audio_url, fallback_url=episode_url)
-  → tries audio transcription first; if ffmpeg is missing, checks the episode
-    webpage for an embedded YouTube video and transcribes that instead
-```
-
-### Bulk-scrape and archive a blog
-
-Using MCP, your LLM can discover, scrape, and save an entire blog in two calls:
-
-```
-crawl("blog.example.com", mode="rss", metadata=True)
-  → auto-discovers RSS feed even from the homepage
-  → returns JSON metadata with title, date, author per post
-
-batch_scrape(selected_urls, archive_dir="/path/to/library")
-  → scrapes all articles and saves each as a Markdown file in one step
-```
-
-### Collect from behind a login wall
-
-```bash
-crawl https://members.example.com/blog --login | scrape --batch | archive --dir ./members/
-# Opens a real browser for you to log in, then collects with your session
-```
+Note: `--login` applies to URL discovery only (the `crawl` step). The discovered URLs are printed to stdout — scraping the actual content behind the login wall would require the pages to be accessible without authentication, or using the URLs in another tool that supports auth.
 
 ---
 
-## CLI Reference
+## Sync Pipeline
 
-### `content` — Auto-detect and extract (the all-in-one command)
+Automated content collection and knowledge synthesis, driven entirely through email after initial setup.
 
-```bash
-content URL                          # extract to stdout
-content URL --archive                # extract + save to disk
-content URL --no-archive             # force stdout-only
-content --batch < urls.txt           # process multiple URLs
-```
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--archive / --no-archive` | from config | Force archiving on or off |
-| `--dir` | `~/readpile-output` | Output directory when archiving |
-| `--batch` | off | Read URLs from stdin (one per line) |
-
-### `scrape` — Extract articles from web pages
-
-Uses a headless Chromium browser. Tries structured article extraction first (readability heuristics), falls back to generic webpage scraping.
-
-```bash
-scrape https://example.com/post
-crawl https://example.com/blog | scrape --batch
-scrape URL --no-headless --no-robots     # visible browser, skip robots.txt
-```
-
-### `transcribe` — Transcribe audio and video
-
-YouTube videos use the captions API (instant). Local and remote audio/video files use OpenAI Whisper.
-
-```bash
-transcribe https://youtube.com/watch?v=dQw4w9WgXcQ
-transcribe recording.mp3 --model small
-transcribe interview.wav --language es --diarize
-```
-
-### `crawl` — Discover content URLs
-
-Finds URLs from RSS/Atom feeds, blogs (via Playwright), YouTube channels, or full site crawls. Outputs one URL per line.
-
-```bash
-crawl https://example.com/blog                       # auto-detect mode
-crawl https://example.com/feed.xml --recent 5        # RSS, 5 most recent
-crawl https://docs.example.com --mode site --depth 3 # recursive site crawl
-crawl https://members.example.com --mode blog --login # auth via persistent browser
-```
-
-Modes: `auto`, `rss`, `blog`, `site`, `podcast`, `youtube`. Via MCP, `rss` auto-discovers feeds from non-feed URLs, `podcast` and `youtube` auto-discover feeds and return structured metadata. Blog mode returns URLs in alphabetical order; use `rss` mode for date-sorted results.
-
-### `archive` — Save to disk
-
-Reads ContentItems from stdin and writes Markdown files with standardized naming (`YYYY-MM-DD_title-slug.md`).
-
-```bash
-scrape https://example.com/post | archive --dir ./saved/
-crawl URL | scrape --batch | archive --batch --dir ./blog/
-```
-
-### `readpile init` — Set up configuration
-
-```bash
-readpile init
-# Prompts: archive by default? output directory? wiki directory?
-# Writes ~/.readpile/config.toml
-```
-
-### `readpile wiki` — Wiki management
-
-```bash
-readpile wiki init ~/my-wiki --name "AI Research"      # create wiki
-readpile wiki list --wiki ~/my-wiki                    # list pages
-readpile wiki list --wiki ~/my-wiki --category concept # filter by category
-readpile wiki search "attention" --wiki ~/my-wiki      # search pages
-readpile wiki log --wiki ~/my-wiki                     # view log
-readpile wiki log --wiki ~/my-wiki --recent 10         # recent entries
-```
-
----
-
-## Archiving
-
-By default, content goes to stdout. To add content to your library on disk, use `--archive` or set `auto_archive = true` in config.
-
-| Command | `auto_archive = false` (default) | `auto_archive = true` |
-|---------|----------------------------------|----------------------|
-| `content URL` | stdout only | stdout + save to file |
-| `content URL --archive` | stdout + save | stdout + save |
-| `content URL --no-archive` | stdout only | stdout only |
-| MCP `archive()` | always saves (explicit call) | always saves |
-
----
-
-## Configuration
-
-```bash
-readpile init    # interactive setup, writes ~/.readpile/config.toml
-```
-
-```toml
-[general]
-output_dir = "~/readpile-output"      # where archived files go
-auto_archive = false                  # archive by default? (overridden by --archive/--no-archive)
-date_format = "YYYY-MM-DD"
-filename_max_length = 80
-
-[transcribe]
-engine = "auto"                       # "auto" | "whisper" | "whisperx"
-whisper_model = "base"                # "tiny" | "base" | "small" | "medium" | "large"
-diarize = false                       # speaker diarization (requires HF_TOKEN)
-
-[scrape]
-headless = true
-respect_robots = true
-rate_limit = 1.0                      # seconds between requests
-
-[crawl]
-max_depth = 10
-max_pages = 100
-
-[wiki]
-default_dir = ""                      # default wiki directory for MCP tools
-```
-
-| Environment Variable | Description |
-|---------------------|-------------|
-| `HF_TOKEN` | HuggingFace token for speaker diarization |
-| `READPILE_CONFIG` | Override config file path |
-| `YOUTUBE_COOKIES` | Path to a Netscape cookie file for YouTube (see [YouTube IP Blocks](#youtube-ip-blocks)) |
-
----
-
-## YouTube IP Blocks
-
-YouTube aggressively rate-limits transcript/caption requests from cloud providers, corporate networks, and VPNs. If you see errors like "YouTube is blocking transcript requests from this IP," your IP has been flagged.
-
-readpile handles this automatically: when the fast transcript API is blocked, it falls back to `yt-dlp` with cookie authentication. You just need to provide cookies from a logged-in browser session.
-
-### Setup (one-time)
-
-```bash
-# Export cookies from your browser (run in your regular terminal, not inside a sandbox):
-yt-dlp --cookies-from-browser chrome --cookies ~/.readpile/youtube-cookies.txt https://youtube.com
-```
-
-readpile checks these locations automatically (in order):
-1. `~/.readpile/youtube-cookies.txt` (recommended — just put the file here)
-2. `YOUTUBE_COOKIES` environment variable pointing to a cookie file
-3. `youtube_cookies` setting in `~/.readpile/config.toml`
-
-Cookies expire periodically. Re-run the export command when you see the IP block error again.
-
-### Browser options
-
-Replace `chrome` with your browser: `firefox`, `safari`, `edge`, `chromium`, `opera`, or `brave`.
-
-### Why this happens
-
-YouTube's caption API blocks requests that don't come from a recognized browser session. The `youtube-transcript-api` library (which readpile uses for fast, free transcription) makes unauthenticated requests that YouTube increasingly rejects. Browser cookies prove you're a real user with a valid session.
-
----
-
-## Installation
-
-```bash
-pip install readpile               # base: scraping, crawling, YouTube transcription
-pip install readpile[audio]        # + Whisper transcription (torch, ffmpeg-python)
-pip install readpile[mcp]          # + MCP server for LLM integration
-pip install readpile[all]          # everything
-pip install readpile[dev]          # + test/lint tools
-
-playwright install chromium        # required for web scraping
-```
-
-### From source
-
-```bash
-git clone https://github.com/ankurawl/readpile.git
-cd readpile
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev,all]"
-python -m playwright install chromium
-```
-
-> **MCP with a venv:** The repo's `.mcp.json` uses `readpile-mcp`, which must be in PATH.
-> When developing from source in a venv, Claude Code can't find the venv binary.
-> Fix by updating `.mcp.json` locally:
-> ```json
-> { "command": ".venv/bin/readpile-mcp" }
-> ```
-> Or install globally alongside the venv: `pip install -e ".[mcp]"` (without the venv activated).
-
-### System dependencies
-
-| Dependency | Required for | Install |
-|------------|-------------|---------|
-| Chromium | Web scraping | `python -m playwright install chromium` (auto-managed) |
-| ffmpeg | Audio transcription | `brew install ffmpeg` / `apt install ffmpeg` |
-
----
-
-## Project Structure
+### Daily flow
 
 ```
-src/readpile/
-├── cli/             # CLI entry points (main.py parent app, wiki.py subcommands)
-├── scrapers/        # Article + webpage content extraction
-├── transcribers/    # YouTube captions + Whisper audio transcription
-├── crawlers/        # RSS, blog, and site URL discovery
-├── core/            # Config, models, archiver, URL detector, robots.txt
-├── wiki/            # LLMWiki module (models.py, store.py)
-└── mcp_server.py    # MCP server (FastMCP)
+ MORNING (cron)                          YOU (anytime)                    EVENING (cron)
+┌─────────────────────┐    ┌──────────────────────────┐    ┌──────────────────────────┐
+│ readpile sync       │    │ Read digest on phone.    │    │ readpile synthesize      │
+│                     │    │ Reply:                   │    │   --pending              │
+│ 1. Process replies  │    │ "Synthesize 1 and 3.    │    │                          │
+│ 2. Check email      │───→│  Skip 2. Add            │───→│ Processes approved items │
+│ 3. Crawl subs       │    │  https://newblog.com     │    │ into wiki pages.         │
+│ 4. Send digest      │    │  to my subscriptions."   │    │ Items with no reply      │
+└─────────────────────┘    └──────────────────────────┘    │ auto-synthesize after    │
+                                                           │ 7 days.                  │
+                                                           └──────────────────────────┘
 ```
 
----
+### How it handles content
 
-## Running Tests
+| Source type | What happens |
+|-------------|-------------|
+| **Newsletter email** | HTML extracted, converted to markdown via the article scraper |
+| **Forwarded URL** | URL extracted from email body, scraped normally |
+| **RSS/Atom subscription** | New entries scraped as articles |
+| **YouTube channel** | New videos transcribed via captions API |
+| **Podcast** | Tries YouTube embed on episode page first (instant); falls back to Whisper audio transcription |
 
-```bash
-pytest tests/ -v                                           # full suite (335 tests)
-pytest tests/ -m "not slow and not network and not audio"  # fast tests only
-```
+### Digest email
+
+The daily digest groups new items into 3-5 topics (via LLM) and sends them as markdown attachments. Reply to control synthesis:
+
+- *"Synthesize items 1, 3, 4"* — immediate synthesis on next run
+- *"Skip item 2"* — never synthesize
+- *"Add https://newblog.com to my subscriptions"* — adds a feed
+- *"Remove Old Blog from subscriptions"* — removes a feed
+- No reply? Items auto-synthesize after 7 days.
+
+### Deduplication
+
+The same article arriving via both email newsletter and RSS feed is saved only once. URLs are normalized (tracking params stripped, trailing slashes removed, `www.` prefix removed) before comparison. Email content takes priority over feed excerpts when both exist.
 
 ---
 
 ## LLMWiki
 
-readpile includes an LLM-maintained wiki layer inspired by [Karpathy's LLMWiki concept](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f). Instead of re-deriving answers from raw documents every time, the LLM incrementally builds and maintains a structured wiki — summarizing, cross-referencing, and synthesizing sources into a compounding knowledge artifact.
+The wiki is a persistent, compounding artifact — not a disposable summary. The LLM pre-compiles knowledge once, then keeps it current, rather than re-deriving synthesis on every question. Cross-references are already there. Contradictions have already been flagged. Inspired by [Andrej Karpathy's LLMWiki concept](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
+
+Obsidian is the IDE; the LLM is the programmer; the wiki is the codebase.
 
 ### Three-layer architecture
 
 | Layer | Owner | Purpose |
 |-------|-------|---------|
-| **Raw sources** | Immutable | Articles, transcripts, PDFs — saved via `wiki_save_source` |
-| **The wiki** | LLM | Synthesized pages — summaries, entity pages, comparisons, explorations |
-| **The schema** | User + LLM | `.wiki.toml` categories, `wiki-conventions.md` behavioral playbook |
+| **Source files** | Immutable | Articles, transcripts, PDFs — saved via `wiki_save_source`. The raw material the LLM reads from |
+| **Wiki pages** | LLM | Synthesized pages — summaries, entity pages, comparisons, explorations. Created and updated via `wiki_write` |
+| **Schema** | User + LLM | `.wiki.toml` (categories, wiki identity) and `wiki-conventions.md` (behavioral playbook the LLM reads as a prompt) |
 
 ### Wiki directory structure
 
@@ -506,50 +385,13 @@ readpile includes an LLM-maintained wiki layer inspired by [Karpathy's LLMWiki c
 ~/my-wiki/
 ├── .wiki.toml              # schema: name, categories
 ├── wiki-conventions.md     # behavioral playbook (LLM reads this)
-├── index.md                # auto-generated catalog
-├── log.md                  # append-only timeline
-├── sources/                # raw content (immutable)
-└── pages/                  # wiki pages (LLM-maintained)
-```
-
-### Example workflows
-
-**Ingest a URL (LLM-orchestrated via conventions file):**
-```
-User: "Add this to my wiki: https://example.com/article"
-
-LLM:  wiki_read("conventions")                    → loads ingest recipe
-      scrape(url)                                  → raw content + metadata
-      wiki_save_source(content, ...)               → saves to sources/
-      wiki_read("index")                           → current wiki state
-      wiki_write(content, rebuild_index=false)      → intermediate pages
-      wiki_write(content)                          → final page (rebuilds index)
-      wiki_log("ingest | Title | URL\n...")         → appends to log
-```
-
-**Query the wiki:**
-```
-User: "What do my sources say about attention mechanisms?"
-
-LLM:  wiki_read("index")                          → finds relevant pages
-      wiki_search("attention")                     → finds additional matches
-      wiki_read("attention-mechanism")             → reads the page
-      Synthesizes answer, optionally files it back as an "exploration" page
-```
-
-**Lint the wiki:**
-```
-User: "Check my wiki for issues"
-
-LLM:  wiki_list()                                  → all pages with metadata
-      Checks for orphan pages, broken links, stale sources
-      wiki_delete("old-draft")                     → removes orphan pages
-      wiki_log("lint | full scan\n...")             → records findings
+├── index.md                # auto-generated catalog (never edit manually)
+├── log.md                  # append-only timeline of operations
+├── sources/                # source files — raw extracted content (immutable)
+└── pages/                  # wiki pages — LLM-synthesized (continuously updated)
 ```
 
 ### Wiki page frontmatter
-
-Three timestamps track the source, wiki, and page lifecycles:
 
 ```yaml
 title: "Attention Mechanism"
@@ -562,24 +404,11 @@ ingested: 2026-05-10        # when added to wiki (immutable)
 updated: 2026-05-17         # when page was last modified
 ```
 
-### MCP tools
-
-| Tool | Purpose |
-|------|---------|
-| `wiki_init` | Create wiki scaffold with conventions file |
-| `wiki_save_source` | Save raw content to `sources/` |
-| `wiki_read` | Read pages, sources, index, log, or conventions |
-| `wiki_write` | Create/update pages with frontmatter validation. Use `rebuild_index=false` for batch writes |
-| `wiki_list` | List pages with metadata, optionally filtered by category |
-| `wiki_search` | Full-text search across pages and/or sources |
-| `wiki_log` | Append timestamped entry to the operation log |
-| `wiki_delete` | Delete a page and rebuild the index |
-
 ### Customization
 
-The behavioral playbook (`wiki-conventions.md`) is a markdown file the LLM reads during wiki operations. Edit it to change how the LLM categorizes, cross-references, and synthesizes content. Different wikis can have different conventions.
+Edit `wiki-conventions.md` to change how the LLM categorizes, cross-references, and synthesizes content. Different wikis can have different conventions — an AI research wiki might want aggressive cross-referencing; a reading log might want minimal structure.
 
-The schema (`.wiki.toml`) defines categories and wiki identity. Default categories: `concept`, `entity`, `summary`, `comparison`, `exploration`, `reference`.
+The schema (`.wiki.toml`) defines categories. Defaults: `concept`, `entity`, `summary`, `comparison`, `exploration`, `reference`.
 
 ### Obsidian compatibility
 
@@ -587,6 +416,192 @@ The wiki works as an Obsidian vault out of the box — `[[wikilinks]]`, YAML fro
 
 ---
 
+## Configuration
+
+### Main config (`~/.readpile/config.toml`)
+
+Generated by `readpile init`. Re-run `readpile init` at any time to regenerate with new values. All settings have sensible defaults.
+
+```toml
+[general]
+output_dir = "~/readpile-output"
+auto_archive = false              # archive by default? (overridden by --archive/--no-archive)
+date_format = "YYYY-MM-DD"
+filename_max_length = 80
+
+[scrape]
+headless = true
+respect_robots = true
+rate_limit = 1.0                  # seconds between requests
+
+[crawl]
+max_depth = 10
+max_pages = 100
+
+[transcribe]
+engine = "auto"                   # "auto" | "whisper" | "whisperx"
+whisper_model = "base"            # "tiny" | "base" | "small" | "medium" | "large"
+diarize = false                   # speaker diarization (requires HF_TOKEN)
+
+[wiki]
+default_dir = ""                  # default wiki directory for MCP tools
+
+[llm]
+provider = "claude"               # "claude", "openai", or "ollama"
+model = "claude-sonnet-4-6"
+# API key via env: READPILE_LLM_API_KEY
+
+[sync]
+synthesis_wait_days = 7           # days before auto-synthesizing unreplied items
+max_auto_synthesize_per_run = 20  # cap per run (oldest first)
+
+[sync.email]
+enabled = true
+provider = "gmail"
+account = "readpile-inbox@gmail.com"
+# Gmail OAuth: download credentials JSON to ~/.readpile/email-credentials.json
+# First run opens browser for consent; token cached automatically after that
+
+[sync.digest]
+enabled = true
+to = "personal@email.com"
+from = "readpile-inbox@gmail.com"
+# SMTP password via env: READPILE_SMTP_PASSWORD
+# This is the App Password for the READPILE email account (the "from" address),
+# NOT your personal email. It lets readpile send digests from that inbox.
+# Requires 2FA enabled on the account, then generate at:
+# Google Account → Security → App Passwords
+```
+
+### Subscriptions (`~/.readpile/sources.toml`)
+
+Machine-managed via `readpile sources` commands. Kept separate so subscription management never touches your hand-edited settings.
+
+```toml
+[[sources]]
+name = "Example Blog"
+url = "https://blog.example.com/feed/"
+kind = "rss"
+
+[[sources]]
+name = "3Blue1Brown"
+url = "https://youtube.com/@3blue1brown"
+kind = "youtube"
+
+[[sources]]
+name = "Weekly Roundup"
+url = "https://roundup.example.com/feed/"
+kind = "rss"
+synthesize = false    # save source files but skip wiki synthesis
+```
+
+### Environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `READPILE_LLM_API_KEY` | API key for Claude, OpenAI, or custom LLM provider (used by sync pipeline) |
+| `READPILE_SMTP_PASSWORD` | Gmail App Password for the **readpile inbox** (the `from` address in digest config) — lets readpile send digest emails from that account |
+| `HF_TOKEN` | HuggingFace token for speaker diarization |
+| `READPILE_CONFIG` | Override config file path |
+| `YOUTUBE_COOKIES` | Path to YouTube cookie file (see below) |
+
+### Gmail OAuth setup
+
+readpile needs two things from your readpile Gmail account: an **App Password** (to send digest emails) and **OAuth credentials** (to read the inbox). The App Password is straightforward — the OAuth part requires a one-time Google Cloud setup. Here's the full walkthrough:
+
+**1. Create a Google Cloud project**
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com/) and sign in with any Google account (doesn't have to be the readpile inbox account)
+2. Click the project dropdown at the top of the page → **New Project**
+3. Name it something like "readpile" → **Create**
+4. Make sure the new project is selected in the dropdown
+
+**2. Enable the Gmail API**
+
+1. In the left sidebar, go to **APIs & Services → Library**
+2. Search for "Gmail API"
+3. Click **Gmail API** → **Enable**
+
+**3. Configure the OAuth consent screen**
+
+1. Go to **APIs & Services → OAuth consent screen**
+2. Select **External** (unless you have a Google Workspace org) → **Create**
+3. Fill in the required fields:
+   - App name: `readpile`
+   - User support email: your email
+   - Developer contact: your email
+4. Click **Save and Continue** through the remaining steps (Scopes, Test users, Summary)
+5. On the **Test users** step, click **Add Users** and add the readpile inbox email (e.g. `readpile-inbox@gmail.com`)
+
+**4. Create OAuth client credentials**
+
+1. Go to **APIs & Services → Credentials**
+2. Click **Create Credentials → OAuth client ID**
+3. Application type: **Desktop app**
+4. Name: `readpile`
+5. Click **Create**
+6. Click **Download JSON** on the confirmation dialog
+7. Move the downloaded file to `~/.readpile/email-credentials.json`:
+
+```bash
+mv ~/Downloads/client_secret_*.json ~/.readpile/email-credentials.json
+chmod 600 ~/.readpile/email-credentials.json
+```
+
+**5. Authorize readpile**
+
+Run `readpile sync` — it will open your browser and ask you to sign in with the readpile inbox account and grant access. This is a one-time step; the token is cached in `~/.readpile/email-token.json` and refreshes automatically after that.
+
+```bash
+readpile sync
+# Browser opens → sign in with readpile-inbox@gmail.com → click Allow
+```
+
+> **Note:** Since the app is in "Testing" mode, Google shows a warning screen. Click **Advanced → Go to readpile (unsafe)**. This is safe — you created this app yourself. If you want to remove the warning, publish the app from the OAuth consent screen (no review needed for personal use with fewer than 100 users).
+
+### YouTube IP blocks
+
+YouTube blocks transcript requests from certain IPs (cloud, corporate, VPN). readpile falls back to `yt-dlp` with cookie authentication automatically. Export cookies once:
+
+```bash
+yt-dlp --cookies-from-browser chrome --cookies ~/.readpile/youtube-cookies.txt https://youtube.com
+```
+
+readpile checks: `~/.readpile/youtube-cookies.txt`, then `YOUTUBE_COOKIES` env var, then `youtube_cookies` in config. Re-export when cookies expire. Replace `chrome` with your browser: `firefox`, `safari`, `edge`, `chromium`, `opera`, `brave`.
+
+---
+
+## Terminology
+
+| Term | Meaning |
+|------|---------|
+| **Source file** | Raw extracted content saved to `~/my-wiki/sources/`. Immutable — the LLM reads from these but never modifies them. Created by `wiki_save_source` or by the sync pipeline |
+| **Wiki page** | LLM-synthesized page in `~/my-wiki/pages/`. Summaries, entity pages, comparisons, explorations. Created and updated by `wiki_write` |
+| **Subscription** | An RSS feed, YouTube channel, or podcast configured in `~/.readpile/sources.toml` via `readpile sources add`. The sync pipeline checks these for new content |
+| **Archive** | A flat file saved to `~/readpile-output/` via the `archive` command — the non-wiki workflow for quick saves without synthesis |
+| **Digest** | The daily email sent by `readpile sync` with topic-grouped summaries of new content |
+
+---
+
+## Security
+
+All secrets stay outside the codebase and outside git:
+
+| Data | Storage | Protection |
+|------|---------|------------|
+| LLM API key | `READPILE_LLM_API_KEY` env var | Never written to any file |
+| SMTP password | `READPILE_SMTP_PASSWORD` env var | Never written to any file |
+| OAuth client credentials | `~/.readpile/email-credentials.json` | chmod 600, not in repo |
+| OAuth token | `~/.readpile/email-token.json` | chmod 600, auto-refreshed |
+| Config file | `~/.readpile/config.toml` | Contains no secrets |
+| Wiki content | `~/my-wiki/` | No secrets — safe for git or Obsidian |
+
+`readpile init` creates `~/.readpile/` with chmod 700 and sets chmod 600 on credential files automatically.
+
+The sync pipeline is designed for a single machine. The state file (`~/.readpile/sync-state.json`) is machine-local. If you sync your wiki via git or cloud storage, only run `readpile sync` on one machine to avoid duplicate processing.
+
+---
+
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE) for details. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup.

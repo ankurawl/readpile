@@ -136,7 +136,7 @@ def _crawl_site(
 # ---------------------------------------------------------------------------
 
 
-@app.callback(invoke_without_command=True)
+@app.command()
 def main(
     url: Optional[str] = typer.Argument(
         None,

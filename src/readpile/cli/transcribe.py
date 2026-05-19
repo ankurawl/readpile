@@ -73,7 +73,7 @@ def _transcribe_single(
 # ---------------------------------------------------------------------------
 
 
-@app.callback(invoke_without_command=True)
+@app.command()
 def main(
     source: Optional[str] = typer.Argument(
         None,

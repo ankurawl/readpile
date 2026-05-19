@@ -96,7 +96,7 @@ def _process_single(source: str) -> list[ContentItem]:
     raise typer.Exit(code=1)
 
 
-@app.callback(invoke_without_command=True)
+@app.command()
 def main(
     source: Optional[str] = typer.Argument(  # noqa: UP007
         None,

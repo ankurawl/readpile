@@ -8,7 +8,7 @@ import pytest
 from readpile.cli.init import _CONFIG_TEMPLATE
 
 
-_FMT_KWARGS = dict(output_dir="~/readpile-output", auto_archive="false", whisper_model="medium")
+_FMT_KWARGS = dict(output_dir="~/readpile-output", auto_archive="false", whisper_model="medium", wiki_dir="~/my-wiki")
 
 
 class TestConfigTemplate:
@@ -26,12 +26,13 @@ class TestConfigTemplate:
         assert "[transcribe]" in rendered
         assert "[scrape]" in rendered
         assert "[crawl]" in rendered
+        assert "[wiki]" in rendered
 
     def test_auto_archive_true(self):
-        rendered = _CONFIG_TEMPLATE.format(output_dir="~/my-output", auto_archive="true", whisper_model="medium")
+        rendered = _CONFIG_TEMPLATE.format(output_dir="~/my-output", auto_archive="true", whisper_model="medium", wiki_dir="~/my-wiki")
         assert "auto_archive = true" in rendered
         assert 'output_dir = "~/my-output"' in rendered
 
     def test_whisper_model_in_template(self):
-        rendered = _CONFIG_TEMPLATE.format(output_dir="~/out", auto_archive="false", whisper_model="large")
+        rendered = _CONFIG_TEMPLATE.format(output_dir="~/out", auto_archive="false", whisper_model="large", wiki_dir="~/my-wiki")
         assert 'whisper_model = "large"' in rendered

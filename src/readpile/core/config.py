@@ -32,7 +32,7 @@ DEFAULTS: dict = {
         "max_pages": 100,
     },
     "wiki": {
-        "default_dir": "",
+        "default_dir": "~/my-wiki",
     },
     "llm": {
         "provider": "claude",

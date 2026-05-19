@@ -101,7 +101,7 @@ async def _run(
 # ---------------------------------------------------------------------------
 
 
-@app.callback(invoke_without_command=True)
+@app.command()
 def main(
     url: Optional[str] = typer.Argument(  # noqa: UP007
         None,

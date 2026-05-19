@@ -305,8 +305,9 @@ class TestErrorCases:
 
 
 class TestConfigDefaults:
-    def test_wiki_section_in_defaults(self):
+    def test_wiki_section_in_defaults(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("READPILE_CONFIG", str(tmp_path / "nonexistent.toml"))
         from readpile.core.config import load_config
         config = load_config()
         assert "wiki" in config
-        assert config["wiki"]["default_dir"] == ""
+        assert config["wiki"]["default_dir"] == "~/my-wiki"

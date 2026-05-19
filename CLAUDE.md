@@ -1,6 +1,13 @@
 # readpile
 
-Content extraction toolkit for LLMs. Build a personal library from articles, videos, podcasts, and documentation.
+Content extraction toolkit for LLMs. Build a personal knowledge base from articles, videos, podcasts, and documentation. See [README.md](README.md) for user-facing docs and [CONTRIBUTING.md](CONTRIBUTING.md) for development setup.
+
+## Terminology
+
+- **Source file** — raw extracted content in `~/my-wiki/sources/` (immutable)
+- **Wiki page** — LLM-synthesized page in `~/my-wiki/pages/`
+- **Subscription** — RSS feed, YouTube channel, or podcast in `~/.readpile/sources.toml`
+- **Archive** — flat file saved to `~/readpile-output/` (non-wiki workflow)
 
 ## MCP Server
 
@@ -13,11 +20,11 @@ readpile exposes 14 tools via MCP (Model Context Protocol):
 - **archive** — Save content to disk as markdown files
 - **detect_type** — Identify URL type (youtube, rss, blog, audio, video, etc.)
 - **wiki_init** — Create a wiki with directory structure, `.wiki.toml` config, and `wiki-conventions.md`
-- **wiki_save_source** — Save raw content to the wiki's `sources/` directory
-- **wiki_read** — Read a wiki page, source, or special file (index, log, conventions)
+- **wiki_save_source** — Save raw content to the wiki's `sources/` directory as a source file
+- **wiki_read** — Read a wiki page, source file, or special file (index, log, conventions)
 - **wiki_write** — Create or update a wiki page in `pages/` with frontmatter validation
 - **wiki_list** — List all wiki pages with metadata, optionally filtered by category
-- **wiki_search** — Full-text search across pages and/or sources
+- **wiki_search** — Full-text search across pages and/or source files
 - **wiki_log** — Append a timestamped entry to the wiki's operation log
 - **wiki_delete** — Delete a wiki page and rebuild the index
 
@@ -102,6 +109,12 @@ readpile wiki init PATH    # Create a wiki
 readpile wiki list         # List wiki pages
 readpile wiki search QUERY # Search wiki pages
 readpile wiki log          # View wiki log
+readpile sync              # Check email + subscriptions, send digest
+readpile synthesize        # Synthesize source files into wiki pages
+readpile sources add URL   # Add a subscription
+readpile sources list      # List subscriptions
+readpile sources remove N  # Remove a subscription
+readpile status            # Show sync overview
 ```
 
 ## ContentItem Format
@@ -132,7 +145,7 @@ src/readpile/
 ├── cli/           # Typer CLI commands (main.py is the entry point)
 ├── scrapers/      # Article + webpage extraction
 ├── transcribers/  # YouTube + audio transcription
-├── crawlers/      # RSS, blog, site crawlers
+├── crawlers/      # RSS, blog, site crawlers + feed/podcast/YouTube discovery
 ├── core/          # Config, models, archiver, detector
 ├── sync/          # Sync pipeline (email, feeds, digest, synthesis)
 ├── wiki/          # LLMWiki module (models, store)
@@ -151,7 +164,7 @@ An LLM-maintained wiki layer on top of readpile's content extraction. Inspired b
 ├── wiki-conventions.md     # behavioral playbook for the LLM
 ├── index.md                # auto-generated catalog (never edit manually)
 ├── log.md                  # append-only timeline of operations
-├── sources/                # raw content (immutable, saved via wiki_save_source)
+├── sources/                # source files — raw content (immutable, saved via wiki_save_source)
 └── pages/                  # wiki pages (LLM-created via wiki_write)
 ```
 
@@ -196,23 +209,23 @@ default_dir = "~/my-wiki"   # in ~/.readpile/config.toml
 
 ## Sync Pipeline
 
-Automated content collection and knowledge synthesis via email and RSS feeds.
+Automated content collection and knowledge synthesis via email and subscriptions (RSS feeds, YouTube channels, podcasts).
 
 ### Commands
 
 ```
-readpile sync              # Check email + feeds, send daily digest
-readpile sync --no-email   # Feeds only
+readpile sync              # Check email + subscriptions, send daily digest
+readpile sync --no-email   # Subscriptions only
 readpile sync --no-feeds   # Email only
 readpile sync --dry-run    # Preview without saving
-readpile sync --reset-feeds # Clear feed state, re-process
+readpile sync --reset-feeds # Clear subscription state, re-process
 readpile synthesize --pending  # Synthesize approved items (cron)
 readpile synthesize --all     # Synthesize everything
-readpile synthesize --source PATH  # Specific source
-readpile sources add URL      # Add feed source (auto-detect)
-readpile sources list         # List all sources
-readpile sources remove NAME  # Remove source
-readpile sources enable NAME  # Re-enable disabled source
+readpile synthesize --source PATH  # Specific source file
+readpile sources add URL      # Add subscription (auto-detect)
+readpile sources list         # List all subscriptions
+readpile sources remove NAME  # Remove subscription
+readpile sources enable NAME  # Re-enable disabled subscription
 readpile status               # Show sync overview
 ```
 
@@ -228,8 +241,8 @@ The sync module (`src/readpile/sync/`) contains:
 - `pipeline.py` — async orchestrator (email → feeds → save → digest)
 - `synthesizer.py` — LLM wiki page creation with quality gate
 - `state.py` — JSON-backed state tracking + lock file
-- `sources.py` — source registry (reads/writes sources.toml)
-- `feeds.py` — feed crawling with rate limiting
+- `sources.py` — subscription registry (reads/writes sources.toml)
+- `feeds.py` — subscription crawling with rate limiting
 - `digest.py` — topic grouping (LLM) + email sending
 - `reply.py` — parse user replies to digest emails
 - `llm.py` — LLM calls via OpenAI-compatible API
@@ -259,7 +272,7 @@ to = "personal@email.com"
 # SMTP password via env: READPILE_SMTP_PASSWORD
 ```
 
-Sources are stored separately in `~/.readpile/sources.toml` (machine-managed via `readpile sources` commands).
+Subscriptions are stored separately in `~/.readpile/sources.toml` (machine-managed via `readpile sources` commands).
 
 ### Security
 
