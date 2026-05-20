@@ -1,4 +1,4 @@
-"""CLI commands — readpile sync, synthesize, sources, status."""
+"""CLI commands — readpile sync, synthesize, feeds, status."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import typer
 
 sync_app = typer.Typer()
 synthesize_app = typer.Typer()
-sources_app = typer.Typer()
+feeds_app = typer.Typer()
 status_app = typer.Typer()
 
 
@@ -90,24 +90,24 @@ def synthesize(
         asyncio.run(synth.process_pending(verbose=verbose))
 
 
-@sources_app.command("add")
-def sources_add(
+@feeds_app.command("add")
+def feeds_add(
     url: str = typer.Argument(..., help="Feed URL to add"),
-    name: Optional[str] = typer.Option(None, help="Source name"),
-    kind: Optional[str] = typer.Option(None, help="Source kind (rss/youtube/podcast)"),
+    name: Optional[str] = typer.Option(None, help="Feed name"),
+    kind: Optional[str] = typer.Option(None, help="Feed kind (rss/youtube/podcast)"),
 ) -> None:
-    """Add a feed source."""
+    """Add a feed subscription."""
     import asyncio
     from readpile.core.config import get_config_path
     from readpile.core.detector import detect_url_type, URLType
-    from readpile.sync.sources import SourceRegistry, Source
+    from readpile.sync.sources import FeedRegistry, Feed
     from readpile.crawlers.discovery import (
         discover_feed, discover_podcast_feed, resolve_youtube_feed, _ensure_scheme,
     )
 
     config_dir = get_config_path().parent
-    registry = SourceRegistry(
-        config_dir / "sources.toml",
+    registry = FeedRegistry(
+        config_dir / "feeds.toml",
         config_dir / "sync.lock",
     )
 
@@ -151,46 +151,46 @@ def sources_add(
     typer.echo(f"Auto-detected: {detected_kind}")
     typer.echo(f'Name: "{source_name}"')
 
-    source = Source(name=source_name, url=feed_url, kind=detected_kind)
+    new_feed = Feed(name=source_name, url=feed_url, kind=detected_kind)
     registry.load()
-    registry.add(source)
-    typer.echo("Added to sources.toml")
+    registry.add(new_feed)
+    typer.echo("Added to feeds.toml")
 
 
-@sources_app.command("list")
-def sources_list() -> None:
-    """List all configured sources."""
+@feeds_app.command("list")
+def feeds_list() -> None:
+    """List all configured feed subscriptions."""
     from readpile.core.config import get_config_path
-    from readpile.sync.sources import SourceRegistry
+    from readpile.sync.sources import FeedRegistry
 
     config_dir = get_config_path().parent
-    registry = SourceRegistry(config_dir / "sources.toml")
-    sources = registry.load()
+    registry = FeedRegistry(config_dir / "feeds.toml")
+    feeds = registry.load()
 
-    if not sources:
-        typer.echo("No sources configured.")
+    if not feeds:
+        typer.echo("No feeds configured.")
         return
 
-    for s in sources:
+    for f in feeds:
         status = ""
-        if s.disabled:
+        if f.disabled:
             status = " [disabled]"
-        elif not s.synthesize:
+        elif not f.synthesize:
             status = " [no-synth]"
-        typer.echo(f"  {s.name} ({s.kind}) — {s.url}{status}")
+        typer.echo(f"  {f.name} ({f.kind}) — {f.url}{status}")
 
 
-@sources_app.command("remove")
-def sources_remove(
-    name: str = typer.Argument(..., help="Source name to remove"),
+@feeds_app.command("remove")
+def feeds_remove(
+    name: str = typer.Argument(..., help="Feed name to remove"),
 ) -> None:
-    """Remove a feed source."""
+    """Remove a feed subscription."""
     from readpile.core.config import get_config_path
-    from readpile.sync.sources import SourceRegistry
+    from readpile.sync.sources import FeedRegistry
 
     config_dir = get_config_path().parent
-    registry = SourceRegistry(
-        config_dir / "sources.toml",
+    registry = FeedRegistry(
+        config_dir / "feeds.toml",
         config_dir / "sync.lock",
     )
     registry.load()
@@ -198,21 +198,21 @@ def sources_remove(
         registry.remove(name)
         typer.echo(f"Removed: {name}")
     except KeyError:
-        typer.echo(f"Source not found: {name}", err=True)
+        typer.echo(f"Feed not found: {name}", err=True)
         raise typer.Exit(code=1)
 
 
-@sources_app.command("enable")
-def sources_enable(
-    name: str = typer.Argument(..., help="Source name to re-enable"),
+@feeds_app.command("enable")
+def feeds_enable(
+    name: str = typer.Argument(..., help="Feed name to re-enable"),
 ) -> None:
-    """Re-enable a disabled source."""
+    """Re-enable a disabled feed subscription."""
     from readpile.core.config import get_config_path
-    from readpile.sync.sources import SourceRegistry
+    from readpile.sync.sources import FeedRegistry
 
     config_dir = get_config_path().parent
-    registry = SourceRegistry(
-        config_dir / "sources.toml",
+    registry = FeedRegistry(
+        config_dir / "feeds.toml",
         config_dir / "sync.lock",
     )
     registry.load()
@@ -220,7 +220,7 @@ def sources_enable(
         registry.enable(name)
         typer.echo(f"Enabled: {name}")
     except KeyError:
-        typer.echo(f"Source not found: {name}", err=True)
+        typer.echo(f"Feed not found: {name}", err=True)
         raise typer.Exit(code=1)
 
 
@@ -231,7 +231,7 @@ def status(
     """Show sync status overview."""
     from readpile.core.config import load_config, get_config_path
     from readpile.sync.state import SyncState
-    from readpile.sync.sources import SourceRegistry
+    from readpile.sync.sources import FeedRegistry
 
     config = load_config()
     config_dir = get_config_path().parent
@@ -242,8 +242,8 @@ def status(
     wiki_dir = Path(wiki or config.get("wiki", {}).get("default_dir", "")).expanduser()
 
     state = SyncState(state_file, wiki_dir=wiki_dir if wiki_dir.exists() else None)
-    registry = SourceRegistry(config_dir / "sources.toml")
-    sources = registry.load()
+    registry = FeedRegistry(config_dir / "feeds.toml")
+    feeds = registry.load()
 
     last_sync = state._data.get("last_sync", "never")
     pending = state.get_pending()
@@ -254,18 +254,18 @@ def status(
     typer.echo(f"Pending synthesis: {len(pending)}")
     typer.echo(f"Items in last digest: {last_digest_items}")
 
-    if sources:
+    if feeds:
         typer.echo("\nFeed health:")
-        for s in sources:
-            feed_key = s.url
+        for f in feeds:
+            feed_key = f.url
             failures = state.get_consecutive_failures(feed_key)
-            if s.disabled:
+            if f.disabled:
                 status_str = "disabled"
             elif failures > 0:
                 status_str = f"failing ({failures} consecutive)"
             else:
                 status_str = "OK"
-            typer.echo(f"  {s.name}: {status_str}")
+            typer.echo(f"  {f.name}: {status_str}")
 
     if wiki_dir.exists() and (wiki_dir / ".wiki.toml").exists():
         from readpile.wiki import WikiStore

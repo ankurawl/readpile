@@ -84,10 +84,10 @@ These work immediately — no setup needed. Wrap URLs in quotes to avoid shell i
 scrape "https://example.com/blog/post"        # extract an article as markdown
 transcribe "https://youtube.com/watch?v=..."   # get a full transcript
 crawl "https://example.com/blog"               # discover all post URLs
-content "https://example.com/post" --archive   # auto-detect, extract, and save to disk
+content "https://example.com/post"                # auto-detect and extract
 ```
 
-### 3. Set up your library
+### 3. Set up your knowledge base
 
 Before running `readpile init`, have these ready:
 
@@ -103,16 +103,14 @@ Before running `readpile init`, have these ready:
 readpile init
 ```
 
-This walks you through configuration interactively. The init command prints next steps when it finishes, including the exact env vars to set. You can re-run `readpile init` at any time to change your settings.
+This walks you through configuration interactively — including creating your wiki. The init command prints next steps when it finishes, including the exact env vars to set. You can re-run `readpile init` at any time to change your settings.
 
-After init, create your wiki and add subscriptions:
+After init, add feeds. These serve double duty — they define what the sync pipeline crawls for new content **and** which email senders are trusted (see [Trusted senders](#trusted-senders)):
 
 ```bash
-readpile wiki init ~/my-wiki --name "AI Research"
-
-readpile sources add "https://blog.example.com"        # auto-detects RSS feed
-readpile sources add "https://youtube.com/@3blue1brown" # YouTube channel
-readpile sources add "https://acquired.fm"              # podcast
+readpile feeds add "https://blog.example.com"        # auto-detects RSS feed
+readpile feeds add "https://youtube.com/@3blue1brown" # YouTube channel
+readpile feeds add "https://acquired.fm"              # podcast
 ```
 
 ### Set environment variables
@@ -164,7 +162,7 @@ crontab -e
 # 0 20 * * *  readpile synthesize --pending   # evening: build wiki pages
 ```
 
-Each morning, `readpile sync` checks your email inbox and subscriptions for new content, saves source files to the wiki, and sends you a digest email. Reply to the digest to approve or skip synthesis. Each evening, `readpile synthesize` turns approved items into wiki pages.
+Each morning, `readpile sync` checks your email inbox and feeds for new content, saves source files to the wiki, and sends you a digest email. Reply to the digest to approve or skip synthesis. Each evening, `readpile synthesize` turns approved items into wiki pages.
 
 ---
 
@@ -181,14 +179,13 @@ Every capability is available both as a CLI command and as an MCP tool. The CLI 
 | Discover URLs | `crawl URL` | `crawl(url, mode, recent, limit, metadata)` | Find content from RSS feeds, blogs, sites, YouTube channels, or podcasts |
 | Detect type | — | `detect_type(url)` | Identify URL type: youtube, rss, blog, audio, etc. |
 | Auto-detect | `content URL` | — | Detect URL type and route to scrape or transcribe automatically |
-| Batch scrape | — | `batch_scrape(urls, concurrency, archive_dir)` | Scrape multiple URLs in one call. Use `archive_dir` to save all results to disk |
-| Save to disk | `archive < content.md` | `archive(content, title, source_url, dir)` | Save content as `YYYY-MM-DD_title-slug.md` |
+| Batch scrape | — | `batch_scrape(urls, concurrency)` | Scrape multiple URLs in one call |
 
 ### Wiki
 
 | Capability | CLI | MCP | Description |
 |------------|-----|-----|-------------|
-| Create wiki | `readpile wiki init PATH` | `wiki_init(path, name, ...)` | Create directory structure, config, and conventions file |
+| Create wiki | `readpile init` or `readpile wiki init PATH` | `wiki_init(path, name, ...)` | `readpile init` creates one automatically; use `wiki init` for additional wikis |
 | Save source file | — | `wiki_save_source(content, title, ...)` | Save raw content to the wiki's `sources/` directory |
 | Read | — | `wiki_read(page)` | Read a wiki page, source file, index, log, or conventions |
 | Write | — | `wiki_write(content, page, rebuild_index)` | Create or update a wiki page with frontmatter validation |
@@ -201,13 +198,13 @@ Every capability is available both as a CLI command and as an MCP tool. The CLI 
 
 | Capability | CLI | Description |
 |------------|-----|-------------|
-| Sync | `readpile sync` | Check email + subscriptions, save source files, send digest |
+| Sync | `readpile sync` | Check email + feeds, save source files, send digest |
 | Synthesize | `readpile synthesize --pending` | LLM-powered wiki page creation from approved source files |
-| Add subscription | `readpile sources add URL` | Auto-detect type and add a feed subscription |
-| List subscriptions | `readpile sources list` | Show all subscriptions with status |
-| Remove subscription | `readpile sources remove NAME` | Remove a subscription by name |
-| Enable subscription | `readpile sources enable NAME` | Re-enable a disabled subscription |
-| Status | `readpile status` | Overview: last sync, pending count, subscription health |
+| Add feed | `readpile feeds add URL` | Auto-detect type and add a feed |
+| List feeds | `readpile feeds list` | Show all feeds with status |
+| Remove feed | `readpile feeds remove NAME` | Remove a feed by name |
+| Enable feed | `readpile feeds enable NAME` | Re-enable a disabled feed |
+| Status | `readpile status` | Overview: last sync, pending count, feed health |
 
 ### Crawl modes
 
@@ -261,30 +258,31 @@ GPT and BERT differ in three key ways: [answer based on your wiki]...
 ```
  8:00 AM  readpile sync runs via cron
           → checks your email inbox (2 newsletters arrived overnight)
-          → crawls your 5 RSS subscriptions (3 new posts)
+          → crawls your 5 RSS feeds (3 new posts)
           → transcribes 1 new YouTube video from a subscribed channel
           → sends you a digest email: "readpile — May 19 (6 new items)"
 
 10:30 AM  You read the digest on your phone and reply:
           "Synthesize items 1, 3, and 5. Skip item 2.
-           Add https://newblog.com to my subscriptions."
+           Add https://newblog.com to my feeds."
 
  8:00 PM  readpile synthesize runs via cron
           → processes your reply: marks 1, 3, 5 for synthesis, skips 2
-          → adds newblog.com as an RSS subscription
+          → adds newblog.com as an RSS feed
           → reads each source file, compares against existing wiki
           → creates 2 new wiki pages, updates 1 existing page
           → skips item 5 (redundant with existing pages/ml-training.md)
 ```
 
-### Archive an entire blog
+### Bulk-ingest a blog
 
 ```
 You:  "Save every post from blog.example.com to my wiki"
 
 LLM:  [crawls blog.example.com, mode=rss → discovers RSS feed]
       [finds 47 posts with titles, dates, authors]
-      [batch_scrape all 47 URLs → saves each to sources/]
+      [batch_scrape all 47 URLs → full content]
+      [wiki_save_source for each article → saves to sources/]
       [logs: "bulk ingest | blog.example.com | 47 source files saved"]
 
 Saved 47 posts to sources/. They'll appear in your next digest,
@@ -332,8 +330,8 @@ Automated content collection and knowledge synthesis, driven entirely through em
 │                     │    │ Reply:                   │    │   --pending              │
 │ 1. Process replies  │    │ "Synthesize 1 and 3.    │    │                          │
 │ 2. Check email      │───→│  Skip 2. Add            │───→│ Processes approved items │
-│ 3. Crawl subs       │    │  https://newblog.com     │    │ into wiki pages.         │
-│ 4. Send digest      │    │  to my subscriptions."   │    │ Items with no reply      │
+│ 3. Crawl feeds      │    │  https://newblog.com     │    │ into wiki pages.         │
+│ 4. Send digest      │    │  to my feeds."           │    │ Items with no reply      │
 └─────────────────────┘    └──────────────────────────┘    │ auto-synthesize after    │
                                                            │ 7 days.                  │
                                                            └──────────────────────────┘
@@ -345,7 +343,7 @@ Automated content collection and knowledge synthesis, driven entirely through em
 |-------------|-------------|
 | **Newsletter email** | HTML extracted, converted to markdown via the article scraper |
 | **Forwarded URL** | URL extracted from email body, scraped normally |
-| **RSS/Atom subscription** | New entries scraped as articles |
+| **RSS/Atom feed** | New entries scraped as articles |
 | **YouTube channel** | New videos transcribed via captions API |
 | **Podcast** | Tries YouTube embed on episode page first (instant); falls back to Whisper audio transcription |
 
@@ -355,13 +353,34 @@ The daily digest groups new items into 3-5 topics (via LLM) and sends them as ma
 
 - *"Synthesize items 1, 3, 4"* — immediate synthesis on next run
 - *"Skip item 2"* — never synthesize
-- *"Add https://newblog.com to my subscriptions"* — adds a feed
-- *"Remove Old Blog from subscriptions"* — removes a feed
+- *"Add https://newblog.com to my feeds"* — adds a feed
+- *"Remove Old Blog from feeds"* — removes a feed
 - No reply? Items auto-synthesize after 7 days.
 
 ### Deduplication
 
 The same article arriving via both email newsletter and RSS feed is saved only once. URLs are normalized (tracking params stripped, trailing slashes removed, `www.` prefix removed) before comparison. Email content takes priority over feed excerpts when both exist.
+
+### Trusted senders
+
+The sync pipeline only processes emails from **trusted senders** — everything else is silently skipped. This prevents spam, notifications, and other noise from entering your wiki. A sender is trusted if any of the following match:
+
+| Rule | Example |
+|------|---------|
+| Sender's domain matches a configured feed | You added `https://blog.example.com` → emails from `newsletter@example.com` are trusted |
+| Sender is from a known newsletter platform | Substack, Beehiiv, ConvertKit, Buttondown, Mailchimp, Ghost, MailerLite |
+| Sender is listed in `skip_synthesis_senders` | `skip_synthesis_senders = ["friend@gmail.com"]` in `[sync.email]` config |
+
+If `readpile sync` reports `0 email` but you know there are messages in the inbox, the sender probably isn't trusted. To fix it:
+
+- **For newsletters:** add the publication as a feed — `readpile feeds add "https://newsletter-site.com"`. This trusts all email from that domain.
+- **For individual senders:** add them to `skip_synthesis_senders` in `~/.readpile/config.toml`:
+  ```toml
+  [sync.email]
+  skip_synthesis_senders = ["friend@gmail.com", "coworker@company.com"]
+  ```
+
+Run `readpile sync -v` to see which senders are being skipped (`Unknown sender skipped: ...`).
 
 ---
 
@@ -424,8 +443,6 @@ Generated by `readpile init`. Re-run `readpile init` at any time to regenerate w
 
 ```toml
 [general]
-output_dir = "~/readpile-output"
-auto_archive = false              # archive by default? (overridden by --archive/--no-archive)
 date_format = "YYYY-MM-DD"
 filename_max_length = 80
 
@@ -461,6 +478,10 @@ provider = "gmail"
 account = "readpile-inbox@gmail.com"
 # Gmail OAuth: download credentials JSON to ~/.readpile/email-credentials.json
 # First run opens browser for consent; token cached automatically after that
+# Emails from unknown senders are silently skipped. Trust senders by either:
+# - Adding their domain as a feed (readpile feeds add URL), or
+# - Listing them here:
+# skip_synthesis_senders = ["friend@gmail.com"]
 
 [sync.digest]
 enabled = true
@@ -473,22 +494,22 @@ from = "readpile-inbox@gmail.com"
 # Google Account → Security → App Passwords
 ```
 
-### Subscriptions (`~/.readpile/sources.toml`)
+### Feeds (`~/.readpile/feeds.toml`)
 
-Machine-managed via `readpile sources` commands. Kept separate so subscription management never touches your hand-edited settings.
+Machine-managed via `readpile feeds` commands. Kept separate so feed management never touches your hand-edited settings.
 
 ```toml
-[[sources]]
+[[feeds]]
 name = "Example Blog"
 url = "https://blog.example.com/feed/"
 kind = "rss"
 
-[[sources]]
+[[feeds]]
 name = "3Blue1Brown"
 url = "https://youtube.com/@3blue1brown"
 kind = "youtube"
 
-[[sources]]
+[[feeds]]
 name = "Weekly Roundup"
 url = "https://roundup.example.com/feed/"
 kind = "rss"
@@ -577,8 +598,7 @@ readpile checks: `~/.readpile/youtube-cookies.txt`, then `YOUTUBE_COOKIES` env v
 |------|---------|
 | **Source file** | Raw extracted content saved to `~/my-wiki/sources/`. Immutable — the LLM reads from these but never modifies them. Created by `wiki_save_source` or by the sync pipeline |
 | **Wiki page** | LLM-synthesized page in `~/my-wiki/pages/`. Summaries, entity pages, comparisons, explorations. Created and updated by `wiki_write` |
-| **Subscription** | An RSS feed, YouTube channel, or podcast configured in `~/.readpile/sources.toml` via `readpile sources add`. The sync pipeline checks these for new content |
-| **Archive** | A flat file saved to `~/readpile-output/` via the `archive` command — the non-wiki workflow for quick saves without synthesis |
+| **Feed** | An RSS feed, YouTube channel, or podcast configured in `~/.readpile/feeds.toml` via `readpile feeds add`. The sync pipeline checks these for new content |
 | **Digest** | The daily email sent by `readpile sync` with topic-grouped summaries of new content |
 
 ---

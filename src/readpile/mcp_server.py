@@ -1,4 +1,4 @@
-"""MCP server — expose readpile's library tools via Model Context Protocol."""
+"""MCP server — expose readpile tools via Model Context Protocol."""
 
 from __future__ import annotations
 
@@ -229,90 +229,6 @@ def _create_server():
         except SystemExit as e:
             return [str(e)]
 
-    def _resolve_archive_dir(specified_dir: str | None = None) -> Path:
-        """Resolve the archive output directory, with automatic fallback.
-
-        Tries the specified or configured directory first. If it can't be
-        created (e.g., home directory not writable in a sandbox), falls back
-        to ``./readpile-output/`` relative to the current working directory.
-        """
-        from pathlib import Path
-        from readpile.core.config import load_config
-
-        if specified_dir is not None:
-            target = Path(specified_dir).expanduser()
-        else:
-            config = load_config()
-            target = Path(
-                config.get("general", {}).get("output_dir", "~/readpile-output")
-            ).expanduser()
-
-        try:
-            target.mkdir(parents=True, exist_ok=True)
-            return target
-        except (PermissionError, OSError):
-            fallback = Path("readpile-output").resolve()
-            fallback.mkdir(parents=True, exist_ok=True)
-            return fallback
-
-    @mcp.tool()
-    def archive(
-        content: str,
-        title: str,
-        source_url: str,
-        content_type: str = "article",
-        date: str | None = None,
-        author: str | None = None,
-        dir: str | None = None,
-    ) -> str:
-        """Save content to your library as a markdown file with YAML front matter.
-
-        Args:
-            content: The text content to save.
-            title: Title for the content.
-            source_url: Original source URL.
-            content_type: One of: article, youtube, audio, podcast, webpage.
-            date: Publish date in YYYY-MM-DD format (used in filename). Defaults to today.
-            author: Author name (included in filename and metadata).
-            dir: Library directory (default: ~/readpile-output or config value).
-
-        Returns the path to the saved file.
-        """
-        try:
-            from pathlib import Path
-            from readpile.core.models import ContentItem, ContentType
-            from readpile.core.archiver import Archiver
-
-            try:
-                ct = ContentType(content_type)
-            except ValueError:
-                valid = ", ".join(t.value for t in ContentType)
-                return f"Error: invalid content_type '{content_type}'. Valid options: {valid}"
-
-            date_val = None
-            if date is not None:
-                from datetime import date as date_type
-                try:
-                    date_val = date_type.fromisoformat(date)
-                except ValueError:
-                    return f"Error: invalid date '{date}'. Use YYYY-MM-DD format."
-
-            item = ContentItem(
-                text=content,
-                title=title,
-                source_url=source_url,
-                content_type=ct,
-                date=date_val,
-                author=author,
-            )
-
-            output_dir = _resolve_archive_dir(dir)
-            archiver = Archiver(output_dir)
-            saved_path = archiver.save(item)
-            return str(saved_path)
-        except SystemExit as e:
-            return str(e)
-
     @mcp.tool()
     def detect_type(url: str) -> str:
         """Detect the content type of a URL.
@@ -329,20 +245,15 @@ def _create_server():
     async def batch_scrape(
         urls: list[str],
         concurrency: int = 3,
-        archive_dir: str | None = None,
     ) -> str:
         """Scrape multiple URLs in one call with concurrency control.
 
         Args:
             urls: List of URLs to scrape.
             concurrency: Max concurrent scrapes (default 3).
-            archive_dir: Optional directory to save scraped content. Each
-                successfully scraped article is automatically archived as a
-                Markdown file, avoiding the need to call archive() per item.
 
         Returns all scraped content concatenated with ---CONTENT_ITEM---
-        delimiters. Failed URLs are included as error items. When archive_dir
-        is set, saved file paths are appended after the content.
+        delimiters. Failed URLs are included as error items.
         """
         if not urls:
             return "No URLs provided."
@@ -367,25 +278,7 @@ def _create_server():
                     )
 
         items = await asyncio.gather(*[_scrape_one(u) for u in urls])
-        result = ContentItem.to_batch(list(items))
-
-        if archive_dir:
-            from readpile.core.archiver import Archiver
-
-            output_path = _resolve_archive_dir(archive_dir)
-            archiver = Archiver(output_path)
-            saved: list[str] = []
-            for item in items:
-                if not item.title.startswith("Failed:"):
-                    try:
-                        path = archiver.save(item)
-                        saved.append(f"Saved: {path}")
-                    except Exception as exc:
-                        saved.append(f"Error saving {item.source_url}: {exc}")
-            if saved:
-                result += "\n\n---ARCHIVED---\n" + "\n".join(saved)
-
-        return result
+        return ContentItem.to_batch(list(items))
 
     # ------------------------------------------------------------------
     # Wiki tools

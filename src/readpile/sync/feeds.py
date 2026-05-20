@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 from readpile.crawlers import discovery as _discovery
 from readpile.crawlers import rss as _rss
-from readpile.sync.sources import Source, SourceRegistry
+from readpile.sync.sources import Feed, FeedRegistry
 from readpile.sync.state import SyncState
 
 log = logging.getLogger("readpile.sync")
@@ -20,7 +20,7 @@ log = logging.getLogger("readpile.sync")
 class FeedResult:
     """A single discovered feed entry."""
 
-    source: Source
+    source: Feed
     url: str
     title: str
     content_type: str
@@ -35,12 +35,12 @@ class FeedProcessor:
 
     def __init__(
         self,
-        sources: list[Source],
+        feeds: list[Feed],
         state: SyncState,
         config: dict,
-        registry: SourceRegistry | None = None,
+        registry: FeedRegistry | None = None,
     ) -> None:
-        self.sources = sources
+        self.feeds = feeds
         self.state = state
         self.config = config
         self.registry = registry
@@ -61,28 +61,28 @@ class FeedProcessor:
 
     async def check_all(self) -> list[FeedResult]:
         results: list[FeedResult] = []
-        for source in self.sources:
-            if source.disabled:
+        for feed in self.feeds:
+            if feed.disabled:
                 continue
             try:
-                items = await self.check_source(source)
+                items = await self.check_feed(feed)
                 results.extend(items)
-                self.state.reset_failures(source.url)
+                self.state.reset_failures(feed.url)
             except Exception as exc:
-                count = self.state.increment_failure(source.url)
-                log.warning("Feed %s failed (%d/%d): %s", source.name, count, self._max_failures, exc)
+                count = self.state.increment_failure(feed.url)
+                log.warning("Feed %s failed (%d/%d): %s", feed.name, count, self._max_failures, exc)
                 if count >= self._max_failures and self.registry:
                     try:
-                        self.registry.disable(source.name)
-                        log.warning("Auto-disabled feed %s after %d failures", source.name, count)
+                        self.registry.disable(feed.name)
+                        log.warning("Auto-disabled feed %s after %d failures", feed.name, count)
                     except Exception:
                         pass
         return results
 
-    async def check_source(self, source: Source) -> list[FeedResult]:
-        feed_url = source.url
+    async def check_feed(self, feed: Feed) -> list[FeedResult]:
+        feed_url = feed.url
 
-        if source.kind == "youtube":
+        if feed.kind == "youtube":
             resolved = await _discovery.resolve_youtube_feed(feed_url)
             if resolved:
                 feed_url = resolved
@@ -92,21 +92,21 @@ class FeedProcessor:
         )
 
         actual_url = feed_info.get("href") or feed_info.get("feed_url", "")
-        if actual_url and actual_url != source.url and self.registry:
+        if actual_url and actual_url != feed.url and self.registry:
             try:
-                self.registry.update_url(source.name, actual_url)
-                log.info("Feed %s redirected, updated URL: %s", source.name, actual_url)
+                self.registry.update_url(feed.name, actual_url)
+                log.info("Feed %s redirected, updated URL: %s", feed.name, actual_url)
             except Exception:
                 pass
 
-        seen_urls = self.state.get_feed_seen_urls(source.url)
+        seen_urls = self.state.get_feed_seen_urls(feed.url)
         is_first_sync = len(seen_urls) == 0
 
         if is_first_sync and len(entries) > self._max_initial:
             for entry in entries[self._max_initial:]:
                 entry_url = entry.get("url", "")
                 if entry_url:
-                    self.state.mark_url_seen(entry_url, source.url)
+                    self.state.mark_url_seen(entry_url, feed.url)
             entries = entries[:self._max_initial]
 
         results: list[FeedResult] = []
@@ -114,19 +114,19 @@ class FeedProcessor:
             entry_url = entry.get("url", "")
             if not entry_url:
                 continue
-            if self.state.is_url_seen(entry_url, source.url):
+            if self.state.is_url_seen(entry_url, feed.url):
                 continue
 
-            self.state.mark_url_seen(entry_url, source.url)
+            self.state.mark_url_seen(entry_url, feed.url)
 
             ct = "article"
-            if source.kind == "youtube":
+            if feed.kind == "youtube":
                 ct = "youtube"
-            elif source.kind == "podcast":
+            elif feed.kind == "podcast":
                 ct = "podcast"
 
             results.append(FeedResult(
-                source=source,
+                source=feed,
                 url=entry_url,
                 title=entry.get("title", ""),
                 content_type=ct,

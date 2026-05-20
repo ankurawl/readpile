@@ -94,13 +94,13 @@ class SyncPipeline:
         result = SyncResult()
 
         from readpile.core.config import get_config_path
-        from readpile.sync.sources import SourceRegistry
+        from readpile.sync.sources import FeedRegistry
         config_dir = get_config_path().parent
-        registry = SourceRegistry(
-            config_dir / "sources.toml",
+        registry = FeedRegistry(
+            config_dir / "feeds.toml",
             config_dir / "sync.lock",
         )
-        sources = registry.load()
+        feeds = registry.load()
 
         # 1. Process replies
         if state.shutting_down:
@@ -116,7 +116,7 @@ class SyncPipeline:
                 provider = await self._get_email_provider(email_cfg)
                 if verbose:
                     log.info("Processing replies...")
-                await self._process_replies(provider, state, registry, sources)
+                await self._process_replies(provider, state, registry, feeds)
                 state.commit()
             except Exception as exc:
                 log.warning("Email reply processing failed: %s", exc)
@@ -132,7 +132,7 @@ class SyncPipeline:
             if verbose:
                 log.info("Checking email...")
             try:
-                email_items = await self._check_email(provider, state, sources)
+                email_items = await self._check_email(provider, state, feeds)
                 new_items.extend(email_items)
                 result.email_count = len(email_items)
                 state.commit()
@@ -148,7 +148,7 @@ class SyncPipeline:
             if verbose:
                 log.info("Crawling feeds...")
             try:
-                feed_items = await self._crawl_feeds(state, sources, registry)
+                feed_items = await self._crawl_feeds(state, feeds, registry)
                 result.feed_count = len(feed_items)
 
                 for item in feed_items:
@@ -208,13 +208,13 @@ class SyncPipeline:
         return provider
 
     async def _process_replies(
-        self, provider, state: SyncState, registry, sources,
+        self, provider, state: SyncState, registry, feeds,
     ):
         from readpile.sync.reply import (
             ReplyProcessor, SynthesizeAction, SkipAction,
-            AddSourceAction, RemoveSourceAction,
+            AddFeedAction, RemoveFeedAction,
         )
-        from readpile.sync.sources import Source
+        from readpile.sync.sources import Feed
 
         processor = ReplyProcessor(self.config)
         actions = await processor.process(provider, state)
@@ -228,23 +228,23 @@ class SyncPipeline:
                 for path in action.source_paths:
                     state.mark_skipped(path)
                     log.info("Marked as skipped: %s", path)
-            elif isinstance(action, AddSourceAction):
-                source = Source(
+            elif isinstance(action, AddFeedAction):
+                feed = Feed(
                     name=action.name or action.url,
                     url=action.url,
                     kind=action.kind,
                 )
-                registry.add(source)
-                log.info("Added source: %s", action.url)
-            elif isinstance(action, RemoveSourceAction):
+                registry.add(feed)
+                log.info("Added feed: %s", action.url)
+            elif isinstance(action, RemoveFeedAction):
                 try:
                     registry.remove(action.name)
-                    log.info("Removed source: %s", action.name)
+                    log.info("Removed feed: %s", action.name)
                 except KeyError:
-                    log.warning("Source not found for removal: %s", action.name)
+                    log.warning("Feed not found for removal: %s", action.name)
 
     async def _check_email(
-        self, provider, state: SyncState, sources,
+        self, provider, state: SyncState, feeds,
     ) -> list[dict]:
         from readpile.sync.email.extract import extract_content
 
@@ -261,7 +261,7 @@ class SyncPipeline:
                 continue
             state.mark_email_seen(msg.message_id)
 
-            status, extracted = extract_content(msg, sources, self.config)
+            status, extracted = extract_content(msg, feeds, self.config)
             if status.startswith("skipped:unknown"):
                 log.info("Unknown sender skipped: %s", msg.sender)
             for item_data in extracted:
@@ -271,11 +271,11 @@ class SyncPipeline:
         return items
 
     async def _crawl_feeds(
-        self, state: SyncState, sources, registry,
-    ) -> list[dict]:
+        self, state: SyncState, feeds, registry,
+    ):
         from readpile.sync.feeds import FeedProcessor
 
-        processor = FeedProcessor(sources, state, self.config, registry)
+        processor = FeedProcessor(feeds, state, self.config, registry)
         results = await processor.check_all()
 
         items: list[dict] = []

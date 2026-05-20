@@ -253,7 +253,10 @@ class TestResolveWikiDir:
             result = _get_tool("wiki_read")(page="index", wiki_dir=wiki_path)
             assert "Wiki Index" in result
 
-    def test_missing_dir_error(self):
+    def test_missing_dir_error(self, monkeypatch, tmp_path):
+        config_file = tmp_path / "config.toml"
+        config_file.write_text('[wiki]\ndefault_dir = ""\n')
+        monkeypatch.setenv("READPILE_CONFIG", str(config_file))
         result = _get_tool("wiki_read")(page="index", wiki_dir=None)
         assert "Error" in result
 

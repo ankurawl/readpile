@@ -1,4 +1,4 @@
-"""Email content extraction — newsletter/URL detection, trusted source matching."""
+"""Email content extraction — newsletter/URL detection, trusted feed matching."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import re
 from email.utils import parseaddr
 
 from readpile.sync.email.base import EmailMessage
-from readpile.sync.sources import Source
+from readpile.sync.sources import Feed
 
 log = logging.getLogger("readpile.sync")
 
@@ -27,7 +27,7 @@ def _extract_sender_domain(sender: str) -> str:
     return ""
 
 
-def _is_trusted_sender(sender: str, sources: list[Source], skip_senders: list[str]) -> bool:
+def _is_trusted_sender(sender: str, feeds: list[Feed], skip_senders: list[str]) -> bool:
     _, addr = parseaddr(sender)
     addr = addr.lower()
     domain = _extract_sender_domain(sender)
@@ -35,7 +35,7 @@ def _is_trusted_sender(sender: str, sources: list[Source], skip_senders: list[st
     if addr in (s.lower() for s in skip_senders):
         return True
 
-    for s in sources:
+    for s in feeds:
         source_domain = s.url.split("//", 1)[-1].split("/", 1)[0].lower().removeprefix("www.")
         if domain == source_domain or domain.endswith("." + source_domain):
             return True
@@ -71,7 +71,7 @@ def _extract_urls(text: str) -> list[str]:
 
 def extract_content(
     msg: EmailMessage,
-    sources: list[Source],
+    feeds: list[Feed],
     config: dict,
 ) -> tuple[str, list[dict]]:
     """Extract content items from an email message.
@@ -91,7 +91,7 @@ def extract_content(
         log.warning("Email from %s too large (%d bytes), skipping", msg.sender, msg.raw_size)
         return "skipped:too_large", []
 
-    if not _is_trusted_sender(msg.sender, sources, skip_senders):
+    if not _is_trusted_sender(msg.sender, feeds, skip_senders):
         log.info("Unknown sender: %s, skipping", msg.sender)
         return "skipped:unknown_sender", []
 

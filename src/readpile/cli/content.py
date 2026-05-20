@@ -1,8 +1,7 @@
 """CLI — content command.
 
 Convenience orchestrator that auto-detects URL/source type and routes to
-the correct extractor (transcribe, scrape, crawl), then optionally
-saves the result to your library.
+the correct extractor (transcribe, scrape, crawl), and prints to stdout.
 """
 
 from __future__ import annotations
@@ -14,8 +13,6 @@ from typing import Optional
 
 import typer
 
-from readpile.core.archiver import Archiver
-from readpile.core.config import load_config
 from readpile.core.detector import URLType, detect_url_type
 from readpile.core.models import ContentItem, ContentType
 
@@ -107,21 +104,8 @@ def main(
         "--batch",
         help="Process multiple URLs from stdin (one per line).",
     ),
-    dir: Optional[Path] = typer.Option(  # noqa: UP007
-        None,
-        "--dir",
-        help="Archive output directory (default from config).",
-    ),
-    archive: Optional[bool] = typer.Option(  # noqa: UP007
-        None,
-        "--archive/--no-archive",
-        help="Force archiving on or off (default: use config auto_archive).",
-    ),
 ) -> None:
-    """Auto-detect source type, extract content, and optionally save to library."""
-
-    config = load_config()
-    general_cfg = config.get("general", {})
+    """Auto-detect source type, extract content, and print to stdout."""
 
     sources: list[str] = []
 
@@ -157,22 +141,6 @@ def main(
     if not items:
         typer.echo("No content extracted.", err=True)
         raise typer.Exit(code=1)
-
-    should_archive = archive if archive is not None else general_cfg.get("auto_archive", False)
-
-    if should_archive:
-        output_dir: Path
-        if dir is not None:
-            output_dir = Path(dir).expanduser()
-        else:
-            output_dir = Path(
-                general_cfg.get("output_dir", "~/readpile-output")
-            ).expanduser()
-
-        archiver = Archiver(output_dir)
-        for item in items:
-            saved_path = archiver.save(item)
-            typer.echo(f"Saved: {saved_path}", err=True)
 
     if len(items) == 1:
         typer.echo(items[0].to_stdout())

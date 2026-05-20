@@ -10,8 +10,8 @@ import pytest
 
 from readpile.sync.email.base import EmailMessage, EmailProvider
 from readpile.sync.reply import (
-    AddSourceAction,
-    RemoveSourceAction,
+    AddFeedAction,
+    RemoveFeedAction,
     ReplyProcessor,
     SkipAction,
     SynthesizeAction,
@@ -277,48 +277,48 @@ class TestRollingWindow:
 # ---------------------------------------------------------------------------
 
 
-class TestSourceActions:
-    """Replies can add or remove sources."""
+class TestFeedActions:
+    """Replies can add or remove feed subscriptions."""
 
     @pytest.mark.asyncio
     @patch("readpile.sync.llm.generate")
-    async def test_add_source_action(self, mock_generate, tmp_path):
+    async def test_add_feed_action(self, mock_generate, tmp_path):
         mock_generate.return_value = json.dumps([
-            {"type": "add_source", "url": "https://newblog.com/feed", "name": "New Blog"},
+            {"type": "add_feed", "url": "https://newblog.com/feed", "name": "New Blog"},
         ])
         state = _state_with_digest(tmp_path)
         msg = _msg(
             sender="user@example.com",
             subject="Re: readpile — 2026-05-19 (3 new items)",
-            text_body="Add https://newblog.com to my sources",
+            text_body="Add https://newblog.com to my feeds",
         )
         provider = _mock_provider([msg])
         processor = ReplyProcessor(_config())
         actions = await processor.process(provider, state)
 
         assert len(actions) == 1
-        assert isinstance(actions[0], AddSourceAction)
+        assert isinstance(actions[0], AddFeedAction)
         assert actions[0].url == "https://newblog.com/feed"
         assert actions[0].name == "New Blog"
 
     @pytest.mark.asyncio
     @patch("readpile.sync.llm.generate")
-    async def test_remove_source_action(self, mock_generate, tmp_path):
+    async def test_remove_feed_action(self, mock_generate, tmp_path):
         mock_generate.return_value = json.dumps([
-            {"type": "remove_source", "name": "Old Blog"},
+            {"type": "remove_feed", "name": "Old Blog"},
         ])
         state = _state_with_digest(tmp_path)
         msg = _msg(
             sender="user@example.com",
             subject="Re: readpile — 2026-05-19 (3 new items)",
-            text_body="Remove Old Blog from sources",
+            text_body="Remove Old Blog from feeds",
         )
         provider = _mock_provider([msg])
         processor = ReplyProcessor(_config())
         actions = await processor.process(provider, state)
 
         assert len(actions) == 1
-        assert isinstance(actions[0], RemoveSourceAction)
+        assert isinstance(actions[0], RemoveFeedAction)
         assert actions[0].name == "Old Blog"
 
 

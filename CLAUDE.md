@@ -6,18 +6,16 @@ Content extraction toolkit for LLMs. Build a personal knowledge base from articl
 
 - **Source file** — raw extracted content in `~/my-wiki/sources/` (immutable)
 - **Wiki page** — LLM-synthesized page in `~/my-wiki/pages/`
-- **Subscription** — RSS feed, YouTube channel, or podcast in `~/.readpile/sources.toml`
-- **Archive** — flat file saved to `~/readpile-output/` (non-wiki workflow)
+- **Feed** — RSS feed, YouTube channel, or podcast subscription in `~/.readpile/feeds.toml`
 
 ## MCP Server
 
-readpile exposes 14 tools via MCP (Model Context Protocol):
+readpile exposes 13 tools via MCP (Model Context Protocol):
 
 - **scrape** — Extract article/webpage content from a URL (YAML front matter + markdown)
 - **transcribe** — Transcribe YouTube videos, audio/video URLs, or webpages with embedded YouTube players
 - **crawl** — Discover content URLs from RSS feeds, blogs, sites, or podcasts. Auto-discovers RSS feeds from non-feed URLs (e.g., `crawl("blog.com", mode="rss")` finds the feed automatically)
-- **batch_scrape** — Scrape multiple URLs in one call with concurrency control. Use `archive_dir` to save all results to disk in one step
-- **archive** — Save content to disk as markdown files
+- **batch_scrape** — Scrape multiple URLs in one call with concurrency control
 - **detect_type** — Identify URL type (youtube, rss, blog, audio, video, etc.)
 - **wiki_init** — Create a wiki with directory structure, `.wiki.toml` config, and `wiki-conventions.md`
 - **wiki_save_source** — Save raw content to the wiki's `sources/` directory as a source file
@@ -59,7 +57,7 @@ yt-dlp --cookies-from-browser chrome --cookies ~/.readpile/youtube-cookies.txt h
 ```
 crawl(url, mode="youtube", recent=5)   → Video URLs/metadata from a YouTube channel (@handle)
 transcribe(video_url)                  → Full transcript using YouTube captions (no ffmpeg needed)
-archive(content, title, source_url)    → Save to disk (one call per item)
+wiki_save_source(content, title, ...)  → Save to wiki sources (one call per item)
 ```
 
 **Podcast discovery and summarization:**
@@ -68,15 +66,14 @@ crawl(url, mode="podcast", recent=15)  → JSON metadata with episode titles, da
 transcribe(episode_url)                → Full transcript via embedded YouTube (many podcasts embed YT players)
 transcribe(audio_url,                  → If audio fails (no ffmpeg), fallback_url checks the episode
   fallback_url=episode_url)              webpage for an embedded YouTube video and transcribes that instead
-archive(content, title, source_url)    → Save to disk (one call per item)
+wiki_save_source(content, title, ...)  → Save to wiki sources (one call per item)
 ```
 
 **Blog bulk-read:**
 ```
 crawl(url, mode="rss", metadata=True)  → JSON metadata for all entries (auto-discovers feed if needed)
-batch_scrape(selected_urls,            → Full content of multiple articles in one call
-  archive_dir="/path/to/library")        + automatically saved to disk
-archive(content, title, source_url)    → Or save to disk individually (one call per item)
+batch_scrape(selected_urls)            → Full content of multiple articles in one call
+wiki_save_source(content, title, ...)  → Save each article to wiki sources
 ```
 
 ### Setup
@@ -101,19 +98,17 @@ The `.mcp.json` at repo root auto-configures Claude Code. For other clients:
 scrape URL                 # Extract article/webpage content
 transcribe URL             # Transcribe YouTube/audio/video
 crawl URL                  # Discover content URLs
-archive < content.md       # Save to disk
 content URL                # Auto-detect and extract
-content URL --archive      # Extract + save to disk
-readpile init              # Generate config file
-readpile wiki init PATH    # Create a wiki
+readpile init              # Generate config + create wiki
+readpile wiki init PATH    # Create an additional wiki
 readpile wiki list         # List wiki pages
 readpile wiki search QUERY # Search wiki pages
 readpile wiki log          # View wiki log
 readpile sync              # Check email + subscriptions, send digest
 readpile synthesize        # Synthesize source files into wiki pages
-readpile sources add URL   # Add a subscription
-readpile sources list      # List subscriptions
-readpile sources remove N  # Remove a subscription
+readpile feeds add URL   # Add a feed subscription
+readpile feeds list      # List feed subscriptions
+readpile feeds remove N  # Remove a feed subscription
 readpile status            # Show sync overview
 ```
 
@@ -209,7 +204,7 @@ default_dir = "~/my-wiki"   # in ~/.readpile/config.toml
 
 ## Sync Pipeline
 
-Automated content collection and knowledge synthesis via email and subscriptions (RSS feeds, YouTube channels, podcasts).
+Automated content collection and knowledge synthesis via email and feed subscriptions (RSS feeds, YouTube channels, podcasts).
 
 ### Commands
 
@@ -218,14 +213,14 @@ readpile sync              # Check email + subscriptions, send daily digest
 readpile sync --no-email   # Subscriptions only
 readpile sync --no-feeds   # Email only
 readpile sync --dry-run    # Preview without saving
-readpile sync --reset-feeds # Clear subscription state, re-process
+readpile sync --reset-feeds # Clear feed state, re-process
 readpile synthesize --pending  # Synthesize approved items (cron)
 readpile synthesize --all     # Synthesize everything
 readpile synthesize --source PATH  # Specific source file
-readpile sources add URL      # Add subscription (auto-detect)
-readpile sources list         # List all subscriptions
-readpile sources remove NAME  # Remove subscription
-readpile sources enable NAME  # Re-enable disabled subscription
+readpile feeds add URL      # Add feed subscription (auto-detect)
+readpile feeds list         # List all feed subscriptions
+readpile feeds remove NAME  # Remove a feed subscription
+readpile feeds enable NAME  # Re-enable disabled feed subscription
 readpile status               # Show sync overview
 ```
 
@@ -241,8 +236,8 @@ The sync module (`src/readpile/sync/`) contains:
 - `pipeline.py` — async orchestrator (email → feeds → save → digest)
 - `synthesizer.py` — LLM wiki page creation with quality gate
 - `state.py` — JSON-backed state tracking + lock file
-- `sources.py` — subscription registry (reads/writes sources.toml)
-- `feeds.py` — subscription crawling with rate limiting
+- `sources.py` — feed registry (reads/writes feeds.toml)
+- `feeds.py` — feed crawling with rate limiting
 - `digest.py` — topic grouping (LLM) + email sending
 - `reply.py` — parse user replies to digest emails
 - `llm.py` — LLM calls via OpenAI-compatible API
@@ -272,7 +267,7 @@ to = "personal@email.com"
 # SMTP password via env: READPILE_SMTP_PASSWORD
 ```
 
-Subscriptions are stored separately in `~/.readpile/sources.toml` (machine-managed via `readpile sources` commands).
+Feed subscriptions are stored separately in `~/.readpile/feeds.toml` (machine-managed via `readpile feeds` commands).
 
 ### Security
 

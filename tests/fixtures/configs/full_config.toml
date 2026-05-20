@@ -1,5 +1,4 @@
 [general]
-output_dir = "~/custom-output"
 date_format = "YYYY-MM-DD"
 filename_max_length = 100
 

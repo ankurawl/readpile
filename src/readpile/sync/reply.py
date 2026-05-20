@@ -22,18 +22,18 @@ class SkipAction:
 
 
 @dataclass
-class AddSourceAction:
+class AddFeedAction:
     url: str
     name: str = ""
     kind: str = "rss"
 
 
 @dataclass
-class RemoveSourceAction:
+class RemoveFeedAction:
     name: str
 
 
-ReplyAction = SynthesizeAction | SkipAction | AddSourceAction | RemoveSourceAction
+ReplyAction = SynthesizeAction | SkipAction | AddFeedAction | RemoveFeedAction
 
 
 class ReplyProcessor:
@@ -128,8 +128,8 @@ class ReplyProcessor:
 Return a JSON array of actions. Each action has a "type" and relevant fields:
 - {"type": "synthesize", "items": [1, 3, 4]}
 - {"type": "skip", "items": [2]}
-- {"type": "add_source", "url": "https://example.com"}
-- {"type": "remove_source", "name": "Blog Name"}
+- {"type": "add_feed", "url": "https://example.com"}
+- {"type": "remove_feed", "name": "Blog Name"}
 
 Available items: """ + ", ".join(f"{k}: {v}" for k, v in item_map.items())
 
@@ -152,14 +152,14 @@ Available items: """ + ", ".join(f"{k}: {v}" for k, v in item_map.items())
                     paths = [item_map[str(i)] for i in a.get("items", []) if str(i) in item_map]
                     if paths:
                         actions.append(SkipAction(paths))
-                elif atype == "add_source":
-                    actions.append(AddSourceAction(
+                elif atype == "add_feed":
+                    actions.append(AddFeedAction(
                         url=a.get("url", ""),
                         name=a.get("name", ""),
                         kind=a.get("kind", "rss"),
                     ))
-                elif atype == "remove_source":
-                    actions.append(RemoveSourceAction(name=a.get("name", "")))
+                elif atype == "remove_feed":
+                    actions.append(RemoveFeedAction(name=a.get("name", "")))
 
             return actions
         except Exception as exc:
@@ -185,7 +185,7 @@ Available items: """ + ", ".join(f"{k}: {v}" for k, v in item_map.items())
             resolved.append(SkipAction(sorted(skip_paths)))
 
         for action in actions:
-            if isinstance(action, (AddSourceAction, RemoveSourceAction)):
+            if isinstance(action, (AddFeedAction, RemoveFeedAction)):
                 resolved.append(action)
 
         return resolved

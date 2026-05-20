@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from readpile.sync.email.base import EmailMessage
 from readpile.sync.email.extract import extract_content, _extract_sender_domain, _is_trusted_sender
-from readpile.sync.sources import Source
+from readpile.sync.sources import Feed
 
 
 # ---------------------------------------------------------------------------
@@ -35,8 +35,8 @@ def _msg(
     )
 
 
-def _source(url: str, name: str = "Test") -> Source:
-    return Source(name=name, url=url, kind="rss")
+def _feed(url: str, name: str = "Test") -> Feed:
+    return Feed(name=name, url=url, kind="rss")
 
 
 def _config(
@@ -64,8 +64,8 @@ class TestNewsletterDetection:
     def test_html_over_500_chars_is_newsletter(self):
         html = "<html><body>" + "x" * 600 + "</body></html>"
         msg = _msg(sender="news@example.com", html_body=html)
-        sources = [_source("https://example.com")]
-        status, items = extract_content(msg, sources, _config())
+        feeds = [_feed("https://example.com")]
+        status, items = extract_content(msg, feeds, _config())
         assert status == "processed"
         assert len(items) == 1
         assert items[0]["kind"] == "newsletter"
@@ -77,8 +77,8 @@ class TestNewsletterDetection:
             html_body=html,
             headers={"List-Unsubscribe": "<mailto:unsubscribe@example.com>"},
         )
-        sources = [_source("https://example.com")]
-        status, items = extract_content(msg, sources, _config())
+        feeds = [_feed("https://example.com")]
+        status, items = extract_content(msg, feeds, _config())
         assert status == "processed"
         assert len(items) == 1
         assert items[0]["kind"] == "newsletter"
@@ -86,8 +86,8 @@ class TestNewsletterDetection:
     def test_text_over_500_chars_newsletter(self):
         text = "x" * 600
         msg = _msg(sender="news@example.com", text_body=text)
-        sources = [_source("https://example.com")]
-        status, items = extract_content(msg, sources, _config())
+        feeds = [_feed("https://example.com")]
+        status, items = extract_content(msg, feeds, _config())
         assert status == "processed"
         assert len(items) == 1
         assert items[0]["kind"] == "newsletter_text"
@@ -100,56 +100,56 @@ class TestNewsletterDetection:
             html_body=html,
             text_body="Also has text " * 50,
         )
-        sources = [_source("https://example.com")]
-        status, items = extract_content(msg, sources, _config())
+        feeds = [_feed("https://example.com")]
+        status, items = extract_content(msg, feeds, _config())
         assert status == "processed"
         assert items[0]["kind"] == "newsletter"
         assert items[0]["html"] == html
 
 
 # ---------------------------------------------------------------------------
-# Trusted source matching
+# Trusted feed matching
 # ---------------------------------------------------------------------------
 
 
-class TestTrustedSourceMatching:
+class TestTrustedFeedMatching:
     """Only emails from trusted senders are processed."""
 
     def test_configured_source_domain_is_trusted(self):
         msg = _msg(sender="alerts@myblog.com", text_body="x" * 600)
-        sources = [_source("https://myblog.com/feed")]
-        status, items = extract_content(msg, sources, _config())
+        feeds = [_feed("https://myblog.com/feed")]
+        status, items = extract_content(msg, feeds, _config())
         assert status == "processed"
 
     def test_subdomain_of_configured_source_is_trusted(self):
         msg = _msg(sender="noreply@mail.myblog.com", text_body="x" * 600)
-        sources = [_source("https://myblog.com/feed")]
-        status, items = extract_content(msg, sources, _config())
+        feeds = [_feed("https://myblog.com/feed")]
+        status, items = extract_content(msg, feeds, _config())
         assert status == "processed"
 
     def test_unknown_sender_is_skipped(self):
         msg = _msg(sender="stranger@unknown.org", text_body="x" * 600)
-        sources = [_source("https://myblog.com/feed")]
-        status, items = extract_content(msg, sources, _config())
+        feeds = [_feed("https://myblog.com/feed")]
+        status, items = extract_content(msg, feeds, _config())
         assert status == "skipped:unknown_sender"
         assert items == []
 
     def test_known_platform_substack_is_trusted(self):
         msg = _msg(sender="writer@substack.com", html_body="x" * 600)
-        sources = []
-        status, items = extract_content(msg, sources, _config())
+        feeds = []
+        status, items = extract_content(msg, feeds, _config())
         assert status == "processed"
 
     def test_known_platform_subdomain_is_trusted(self):
         msg = _msg(sender="writer@newsletter.beehiiv.com", html_body="x" * 600)
-        sources = []
-        status, items = extract_content(msg, sources, _config())
+        feeds = []
+        status, items = extract_content(msg, feeds, _config())
         assert status == "processed"
 
     def test_www_prefix_stripped_from_source_url(self):
         msg = _msg(sender="hello@example.com", text_body="x" * 600)
-        sources = [_source("https://www.example.com")]
-        status, items = extract_content(msg, sources, _config())
+        feeds = [_feed("https://www.example.com")]
+        status, items = extract_content(msg, feeds, _config())
         assert status == "processed"
 
 
@@ -167,8 +167,8 @@ class TestEmailSizeLimit:
             html_body="x" * 600,
             raw_size=6 * 1024 * 1024,
         )
-        sources = [_source("https://example.com")]
-        status, items = extract_content(msg, sources, _config())
+        feeds = [_feed("https://example.com")]
+        status, items = extract_content(msg, feeds, _config())
         assert status == "skipped:too_large"
         assert items == []
 
@@ -178,8 +178,8 @@ class TestEmailSizeLimit:
             html_body="x" * 600,
             raw_size=2000,
         )
-        sources = [_source("https://example.com")]
-        status, _ = extract_content(msg, sources, _config(max_email_size_bytes=1000))
+        feeds = [_feed("https://example.com")]
+        status, _ = extract_content(msg, feeds, _config(max_email_size_bytes=1000))
         assert status == "skipped:too_large"
 
     def test_under_limit_processed(self):
@@ -188,8 +188,8 @@ class TestEmailSizeLimit:
             html_body="x" * 600,
             raw_size=1000,
         )
-        sources = [_source("https://example.com")]
-        status, items = extract_content(msg, sources, _config())
+        feeds = [_feed("https://example.com")]
+        status, items = extract_content(msg, feeds, _config())
         assert status == "processed"
         assert len(items) == 1
 
@@ -216,8 +216,8 @@ class TestForwardedUrlDetection:
     def test_short_body_with_urls(self):
         text = "Check this out: https://example.com/article"
         msg = _msg(sender="friend@substack.com", text_body=text)
-        sources = []
-        status, items = extract_content(msg, sources, _config())
+        feeds = []
+        status, items = extract_content(msg, feeds, _config())
         assert status == "processed"
         assert len(items) == 1
         assert items[0]["kind"] == "url"
@@ -227,16 +227,16 @@ class TestForwardedUrlDetection:
         urls = [f"https://example.com/article-{i}" for i in range(10)]
         text = "Check these: " + " ".join(urls)
         msg = _msg(sender="friend@substack.com", text_body=text)
-        sources = []
-        status, items = extract_content(msg, sources, _config())
+        feeds = []
+        status, items = extract_content(msg, feeds, _config())
         assert status == "processed"
         assert len(items) == 3
 
     def test_unsubscribe_urls_are_filtered(self):
         text = "Read: https://example.com/article https://example.com/unsubscribe"
         msg = _msg(sender="friend@substack.com", text_body=text)
-        sources = []
-        status, items = extract_content(msg, sources, _config())
+        feeds = []
+        status, items = extract_content(msg, feeds, _config())
         assert status == "processed"
         assert all("unsubscribe" not in item["url"] for item in items)
 
@@ -251,15 +251,15 @@ class TestEmptyContent:
 
     def test_empty_body(self):
         msg = _msg(sender="news@example.com")
-        sources = [_source("https://example.com")]
-        status, items = extract_content(msg, sources, _config())
+        feeds = [_feed("https://example.com")]
+        status, items = extract_content(msg, feeds, _config())
         assert status == "skipped:empty"
         assert items == []
 
     def test_short_text_no_urls(self):
         msg = _msg(sender="news@example.com", text_body="Thanks!")
-        sources = [_source("https://example.com")]
-        status, items = extract_content(msg, sources, _config())
+        feeds = [_feed("https://example.com")]
+        status, items = extract_content(msg, feeds, _config())
         assert status == "skipped:empty"
         assert items == []
 
@@ -274,25 +274,25 @@ class TestSkipSynthesisSenders:
 
     def test_skip_synthesis_sender_is_trusted(self):
         msg = _msg(sender="noreply@promotions.example.com", html_body="x" * 600)
-        sources = []
+        feeds = []
         config = _config(skip_synthesis_senders=["noreply@promotions.example.com"])
-        status, items = extract_content(msg, sources, config)
+        status, items = extract_content(msg, feeds, config)
         assert status == "processed"
         assert items[0]["skip_synthesis"] is True
 
     def test_non_skip_synthesis_sender(self):
         msg = _msg(sender="writer@substack.com", html_body="x" * 600)
-        sources = []
+        feeds = []
         config = _config(skip_synthesis_senders=["other@example.com"])
-        status, items = extract_content(msg, sources, config)
+        status, items = extract_content(msg, feeds, config)
         assert status == "processed"
         assert items[0]["skip_synthesis"] is False
 
     def test_skip_synthesis_case_insensitive(self):
         msg = _msg(sender="NoReply@Example.COM", html_body="x" * 600)
-        sources = []
+        feeds = []
         config = _config(skip_synthesis_senders=["noreply@example.com"])
-        status, items = extract_content(msg, sources, config)
+        status, items = extract_content(msg, feeds, config)
         assert status == "processed"
         assert items[0]["skip_synthesis"] is True
 

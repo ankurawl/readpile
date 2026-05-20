@@ -26,11 +26,11 @@ class TestHelpOutput:
         assert result.exit_code == 0
         assert "sync" in result.output
         assert "synthesize" in result.output
-        assert "sources" in result.output
+        assert "feeds" in result.output
         assert "status" in result.output
 
-    def test_sources_help_shows_subcommands(self):
-        result = runner.invoke(app, ["sources", "--help"])
+    def test_feeds_help_shows_subcommands(self):
+        result = runner.invoke(app, ["feeds", "--help"])
         assert result.exit_code == 0
         assert "add" in result.output
         assert "list" in result.output
@@ -56,36 +56,36 @@ class TestHelpOutput:
 
 
 # ---------------------------------------------------------------------------
-# sources list
+# feeds list
 # ---------------------------------------------------------------------------
 
 
-class TestSourcesList:
-    """readpile sources list with mocked registry."""
+class TestFeedsList:
+    """readpile feeds list with mocked registry."""
 
-    def test_sources_list_empty(self):
+    def test_feeds_list_empty(self):
         with patch(
             "readpile.core.config.get_config_path",
             return_value=Path("/tmp/fake/config.toml"),
         ), patch(
-            "readpile.sync.sources.SourceRegistry.load",
+            "readpile.sync.sources.FeedRegistry.load",
             return_value=[],
         ):
-            result = runner.invoke(app, ["sources", "list"])
+            result = runner.invoke(app, ["feeds", "list"])
 
         assert result.exit_code == 0
-        assert "No sources configured" in result.output
+        assert "No feeds configured" in result.output
 
-    def test_sources_list_with_entries(self):
-        from readpile.sync.sources import Source
+    def test_feeds_list_with_entries(self):
+        from readpile.sync.sources import Feed
 
-        sources = [
-            Source(name="My Blog", url="https://blog.example.com/feed.xml", kind="rss"),
-            Source(
+        feeds = [
+            Feed(name="My Blog", url="https://blog.example.com/feed.xml", kind="rss"),
+            Feed(
                 name="ML Podcast", url="https://podcast.example.com/feed",
                 kind="podcast", synthesize=False,
             ),
-            Source(
+            Feed(
                 name="Old Feed", url="https://old.example.com/rss",
                 kind="rss", disabled=True,
             ),
@@ -95,10 +95,10 @@ class TestSourcesList:
             "readpile.core.config.get_config_path",
             return_value=Path("/tmp/fake/config.toml"),
         ), patch(
-            "readpile.sync.sources.SourceRegistry.load",
-            return_value=sources,
+            "readpile.sync.sources.FeedRegistry.load",
+            return_value=feeds,
         ):
-            result = runner.invoke(app, ["sources", "list"])
+            result = runner.invoke(app, ["feeds", "list"])
 
         assert result.exit_code == 0
         assert "My Blog" in result.output
@@ -118,11 +118,11 @@ class TestStatus:
     """readpile status with mocked state and sources."""
 
     def test_status_shows_overview(self, tmp_path):
-        from readpile.sync.sources import Source
+        from readpile.sync.sources import Feed
 
-        sources = [
-            Source(name="Feed A", url="https://a.example.com/feed", kind="rss"),
-            Source(
+        feeds = [
+            Feed(name="Feed A", url="https://a.example.com/feed", kind="rss"),
+            Feed(
                 name="Feed B", url="https://b.example.com/feed",
                 kind="rss", disabled=True,
             ),
@@ -155,8 +155,8 @@ class TestStatus:
             "readpile.core.config.get_config_path",
             return_value=tmp_path / "config.toml",
         ), patch(
-            "readpile.sync.sources.SourceRegistry.load",
-            return_value=sources,
+            "readpile.sync.sources.FeedRegistry.load",
+            return_value=feeds,
         ):
             result = runner.invoke(app, ["status", "--wiki", str(wiki_dir)])
 
@@ -183,7 +183,7 @@ class TestStatus:
             "readpile.core.config.get_config_path",
             return_value=tmp_path / "config.toml",
         ), patch(
-            "readpile.sync.sources.SourceRegistry.load",
+            "readpile.sync.sources.FeedRegistry.load",
             return_value=[],
         ):
             result = runner.invoke(app, ["status"])

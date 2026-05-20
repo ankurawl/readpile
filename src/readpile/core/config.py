@@ -12,10 +12,8 @@ from pathlib import Path
 
 DEFAULTS: dict = {
     "general": {
-        "output_dir": "~/readpile-output",
         "date_format": "YYYY-MM-DD",
         "filename_max_length": 80,
-        "auto_archive": False,
     },
     "transcribe": {
         "engine": "auto",

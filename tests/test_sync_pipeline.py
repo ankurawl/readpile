@@ -55,7 +55,7 @@ def _base_patches():
     return [
         patch("readpile.sync.logging.setup_logging"),
         patch(
-            "readpile.sync.sources.SourceRegistry.load",
+            "readpile.sync.sources.FeedRegistry.load",
             return_value=[],
         ),
         patch("readpile.core.config.get_config_path", return_value=Path("/tmp/fake/config.toml")),
@@ -76,7 +76,7 @@ class TestPipelineRunsCleanly:
         with (
             patch("readpile.sync.logging.setup_logging"),
             patch(
-                "readpile.sync.sources.SourceRegistry.load",
+                "readpile.sync.sources.FeedRegistry.load",
                 return_value=[],
             ),
             patch(
@@ -97,7 +97,7 @@ class TestPipelineRunsCleanly:
         with (
             patch("readpile.sync.logging.setup_logging"),
             patch(
-                "readpile.sync.sources.SourceRegistry.load",
+                "readpile.sync.sources.FeedRegistry.load",
                 return_value=[],
             ),
             patch(
@@ -125,7 +125,7 @@ class TestSkipFlags:
         with (
             patch("readpile.sync.logging.setup_logging"),
             patch(
-                "readpile.sync.sources.SourceRegistry.load",
+                "readpile.sync.sources.FeedRegistry.load",
                 return_value=[],
             ),
             patch(
@@ -148,7 +148,7 @@ class TestSkipFlags:
         with (
             patch("readpile.sync.logging.setup_logging"),
             patch(
-                "readpile.sync.sources.SourceRegistry.load",
+                "readpile.sync.sources.FeedRegistry.load",
                 return_value=[],
             ),
             patch(
@@ -172,7 +172,7 @@ class TestSkipFlags:
         with (
             patch("readpile.sync.logging.setup_logging"),
             patch(
-                "readpile.sync.sources.SourceRegistry.load",
+                "readpile.sync.sources.FeedRegistry.load",
                 return_value=[],
             ),
             patch(
@@ -193,9 +193,9 @@ class TestDryRun:
 
     @pytest.mark.asyncio
     async def test_dry_run_does_not_save(self, config, wiki_dir, tmp_path):
-        from readpile.sync.sources import Source
+        from readpile.sync.sources import Feed
 
-        source = Source(name="test", url="https://example.com/feed", kind="rss")
+        source = Feed(name="test", url="https://example.com/feed", kind="rss")
 
         # _crawl_feeds returns list[dict], not FeedResult
         feed_item = {
@@ -214,7 +214,7 @@ class TestDryRun:
         with (
             patch("readpile.sync.logging.setup_logging"),
             patch(
-                "readpile.sync.sources.SourceRegistry.load",
+                "readpile.sync.sources.FeedRegistry.load",
                 return_value=[source],
             ),
             patch(
@@ -246,7 +246,7 @@ class TestResetFeeds:
         with (
             patch("readpile.sync.logging.setup_logging"),
             patch(
-                "readpile.sync.sources.SourceRegistry.load",
+                "readpile.sync.sources.FeedRegistry.load",
                 return_value=[],
             ),
             patch(
@@ -272,7 +272,7 @@ class TestLockManagement:
         with (
             patch("readpile.sync.logging.setup_logging"),
             patch(
-                "readpile.sync.sources.SourceRegistry.load",
+                "readpile.sync.sources.FeedRegistry.load",
                 return_value=[],
             ),
             patch(
@@ -299,7 +299,7 @@ class TestLockManagement:
         with (
             patch("readpile.sync.logging.setup_logging"),
             patch(
-                "readpile.sync.sources.SourceRegistry.load",
+                "readpile.sync.sources.FeedRegistry.load",
                 side_effect=RuntimeError("boom"),
             ),
             patch(

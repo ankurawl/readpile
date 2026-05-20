@@ -8,17 +8,26 @@ import pytest
 from readpile.cli.init import _CONFIG_TEMPLATE
 
 
-_FMT_KWARGS = dict(output_dir="~/readpile-output", auto_archive="false", whisper_model="medium", wiki_dir="~/my-wiki")
+_FMT_KWARGS = dict(whisper_model="medium", wiki_dir="~/my-wiki")
 
 
 class TestConfigTemplate:
-    def test_template_has_auto_archive(self):
+    def test_template_has_date_format(self):
         rendered = _CONFIG_TEMPLATE.format(**_FMT_KWARGS)
-        assert "auto_archive = false" in rendered
+        assert 'date_format = "YYYY-MM-DD"' in rendered
+
+    def test_template_has_filename_max_length(self):
+        rendered = _CONFIG_TEMPLATE.format(**_FMT_KWARGS)
+        assert "filename_max_length = 80" in rendered
 
     def test_template_no_summarize_sections(self):
         rendered = _CONFIG_TEMPLATE.format(**_FMT_KWARGS)
         assert "[summarize]" not in rendered
+
+    def test_template_no_archive_fields(self):
+        rendered = _CONFIG_TEMPLATE.format(**_FMT_KWARGS)
+        assert "archive_dir" not in rendered
+        assert "auto_archive" not in rendered
 
     def test_template_has_required_sections(self):
         rendered = _CONFIG_TEMPLATE.format(**_FMT_KWARGS)
@@ -28,11 +37,6 @@ class TestConfigTemplate:
         assert "[crawl]" in rendered
         assert "[wiki]" in rendered
 
-    def test_auto_archive_true(self):
-        rendered = _CONFIG_TEMPLATE.format(output_dir="~/my-output", auto_archive="true", whisper_model="medium", wiki_dir="~/my-wiki")
-        assert "auto_archive = true" in rendered
-        assert 'output_dir = "~/my-output"' in rendered
-
     def test_whisper_model_in_template(self):
-        rendered = _CONFIG_TEMPLATE.format(output_dir="~/out", auto_archive="false", whisper_model="large", wiki_dir="~/my-wiki")
+        rendered = _CONFIG_TEMPLATE.format(whisper_model="large", wiki_dir="~/my-wiki")
         assert 'whisper_model = "large"' in rendered

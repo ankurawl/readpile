@@ -87,7 +87,7 @@ class Archiver:
 
     Parameters
     ----------
-    output_dir:
+    archive_dir:
         Directory where files are written.  Created automatically if it
         does not exist.
     date_format:
@@ -95,9 +95,9 @@ class Archiver:
         (default ``"YYYY-MM-DD"``).
     """
 
-    def __init__(self, output_dir: str | Path, date_format: str = "YYYY-MM-DD") -> None:
-        self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+    def __init__(self, archive_dir: str | Path, date_format: str = "YYYY-MM-DD") -> None:
+        self.archive_dir = Path(archive_dir)
+        self.archive_dir.mkdir(parents=True, exist_ok=True)
         self.date_format = date_format
         self._used_names: set[str] = set()
 
@@ -112,7 +112,7 @@ class Archiver:
         """
         filename = generate_filename(item, date_format=self.date_format)
         filename = self._deduplicate(filename)
-        filepath = self.output_dir / filename
+        filepath = self.archive_dir / filename
         filepath.write_text(item.to_stdout(), encoding="utf-8")
         return filepath
 

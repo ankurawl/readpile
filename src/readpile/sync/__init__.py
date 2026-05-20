@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from readpile.sync.state import SyncState
-from readpile.sync.sources import SourceRegistry, Source
+from readpile.sync.sources import FeedRegistry, Feed
 from readpile.sync.llm import generate
 from readpile.sync.urls import normalize_url
 
 __all__ = [
     "SyncState",
-    "SourceRegistry",
-    "Source",
+    "FeedRegistry",
+    "Feed",
     "generate",
     "normalize_url",
 ]
