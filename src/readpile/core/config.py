@@ -33,7 +33,7 @@ DEFAULTS: dict = {
         "default_dir": "~/my-wiki",
     },
     "llm": {
-        "provider": "claude",
+        "base_url": "anthropic",
         "model": "claude-sonnet-4-6",
     },
     "sync": {

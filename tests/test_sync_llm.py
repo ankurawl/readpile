@@ -6,13 +6,13 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 
-# --- Provider config mapping ---
+# --- Base URL routing ---
 
 
-class TestProviderConfig:
+class TestBaseURLRouting:
     @patch.dict("os.environ", {"READPILE_LLM_API_KEY": "test-key"}, clear=True)
     @patch("openai.OpenAI")
-    def test_claude_provider_uses_anthropic_base_url(self, mock_openai_cls):
+    def test_anthropic_shortcut(self, mock_openai_cls):
         from readpile.sync.llm import generate
 
         mock_client = MagicMock()
@@ -21,7 +21,7 @@ class TestProviderConfig:
             choices=[MagicMock(message=MagicMock(content="response"))]
         )
 
-        config = {"llm": {"provider": "claude", "model": "claude-sonnet-4-6"}}
+        config = {"llm": {"base_url": "anthropic", "model": "claude-sonnet-4-6"}}
         result = generate("system", "user", config)
 
         mock_openai_cls.assert_called_once()
@@ -32,7 +32,7 @@ class TestProviderConfig:
 
     @patch.dict("os.environ", {"READPILE_LLM_API_KEY": "sk-openai"}, clear=True)
     @patch("openai.OpenAI")
-    def test_openai_provider_no_base_url(self, mock_openai_cls):
+    def test_no_base_url_uses_openai_default(self, mock_openai_cls):
         from readpile.sync.llm import generate
 
         mock_client = MagicMock()
@@ -41,7 +41,7 @@ class TestProviderConfig:
             choices=[MagicMock(message=MagicMock(content="ok"))]
         )
 
-        config = {"llm": {"provider": "openai", "model": "gpt-4o"}}
+        config = {"llm": {"model": "gpt-4o"}}
         generate("system", "user", config)
 
         call_kwargs = mock_openai_cls.call_args[1]
@@ -50,7 +50,7 @@ class TestProviderConfig:
 
     @patch.dict("os.environ", {}, clear=True)
     @patch("openai.OpenAI")
-    def test_ollama_provider_uses_localhost_base_url(self, mock_openai_cls):
+    def test_ollama_shortcut(self, mock_openai_cls):
         from readpile.sync.llm import generate
 
         mock_client = MagicMock()
@@ -59,12 +59,78 @@ class TestProviderConfig:
             choices=[MagicMock(message=MagicMock(content="local"))]
         )
 
-        config = {"llm": {"provider": "ollama", "model": "llama3"}}
+        config = {"llm": {"base_url": "ollama", "model": "llama3"}}
         generate("system", "user", config)
 
         call_kwargs = mock_openai_cls.call_args[1]
         assert call_kwargs["base_url"] == "http://localhost:11434/v1"
-        assert call_kwargs["api_key"] == "ollama"
+        assert call_kwargs["api_key"] == "not-needed"
+
+    @patch.dict("os.environ", {"READPILE_LLM_API_KEY": "rtr-key"}, clear=True)
+    @patch("openai.OpenAI")
+    def test_openrouter_shortcut(self, mock_openai_cls):
+        from readpile.sync.llm import generate
+
+        mock_client = MagicMock()
+        mock_openai_cls.return_value = mock_client
+        mock_client.chat.completions.create.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content="ok"))]
+        )
+
+        config = {"llm": {"base_url": "openrouter", "model": "google/gemini-2.0-flash"}}
+        generate("system", "user", config)
+
+        call_kwargs = mock_openai_cls.call_args[1]
+        assert call_kwargs["base_url"] == "https://openrouter.ai/api/v1"
+
+    @patch.dict("os.environ", {"READPILE_LLM_API_KEY": "gem-key"}, clear=True)
+    @patch("openai.OpenAI")
+    def test_gemini_shortcut(self, mock_openai_cls):
+        from readpile.sync.llm import generate
+
+        mock_client = MagicMock()
+        mock_openai_cls.return_value = mock_client
+        mock_client.chat.completions.create.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content="ok"))]
+        )
+
+        config = {"llm": {"base_url": "gemini", "model": "gemini-2.0-flash"}}
+        generate("system", "user", config)
+
+        call_kwargs = mock_openai_cls.call_args[1]
+        assert call_kwargs["base_url"] == "https://generativelanguage.googleapis.com/v1beta/openai/"
+
+    @patch.dict("os.environ", {"READPILE_LLM_API_KEY": "key"}, clear=True)
+    @patch("openai.OpenAI")
+    def test_full_url_passed_through(self, mock_openai_cls):
+        from readpile.sync.llm import generate
+
+        mock_client = MagicMock()
+        mock_openai_cls.return_value = mock_client
+        mock_client.chat.completions.create.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content="ok"))]
+        )
+
+        config = {"llm": {"base_url": "https://my-proxy.example.com/v1", "model": "my-model"}}
+        generate("system", "user", config)
+
+        call_kwargs = mock_openai_cls.call_args[1]
+        assert call_kwargs["base_url"] == "https://my-proxy.example.com/v1"
+
+    @patch.dict("os.environ", {}, clear=True)
+    @patch("openai.OpenAI")
+    def test_localhost_url_skips_api_key_check(self, mock_openai_cls):
+        from readpile.sync.llm import generate
+
+        mock_client = MagicMock()
+        mock_openai_cls.return_value = mock_client
+        mock_client.chat.completions.create.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content="local"))]
+        )
+
+        config = {"llm": {"base_url": "http://localhost:8080/v1", "model": "local-model"}}
+        result = generate("sys", "usr", config)
+        assert result == "local"
 
 
 # --- Message passing ---
@@ -82,7 +148,7 @@ class TestMessagePassing:
             choices=[MagicMock(message=MagicMock(content="done"))]
         )
 
-        config = {"llm": {"provider": "claude", "model": "claude-sonnet-4-6"}}
+        config = {"llm": {"base_url": "anthropic", "model": "claude-sonnet-4-6"}}
         generate("You are helpful.", "Summarize this.", config)
 
         create_kwargs = mock_client.chat.completions.create.call_args[1]
@@ -103,7 +169,7 @@ class TestMessagePassing:
             choices=[MagicMock(message=MagicMock(content=None))]
         )
 
-        config = {"llm": {"provider": "claude", "model": "claude-sonnet-4-6"}}
+        config = {"llm": {"base_url": "anthropic", "model": "claude-sonnet-4-6"}}
         result = generate("sys", "usr", config)
         assert result == ""
 
@@ -122,7 +188,6 @@ class TestRetry:
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
 
-        # Build a real-looking APIStatusError
         mock_response = MagicMock()
         mock_response.status_code = 429
         mock_response.headers = {}
@@ -138,7 +203,7 @@ class TestRetry:
             MagicMock(choices=[MagicMock(message=MagicMock(content="success"))]),
         ]
 
-        config = {"llm": {"provider": "claude", "model": "claude-sonnet-4-6"}}
+        config = {"llm": {"base_url": "anthropic", "model": "claude-sonnet-4-6"}}
         result = generate("sys", "usr", config)
 
         assert result == "success"
@@ -171,7 +236,7 @@ class TestRetry:
             MagicMock(choices=[MagicMock(message=MagicMock(content="ok"))]),
         ]
 
-        config = {"llm": {"provider": "openai", "model": "gpt-4o"}}
+        config = {"llm": {"model": "gpt-4o"}}
         result = generate("sys", "usr", config)
 
         assert result == "ok"
@@ -198,7 +263,7 @@ class TestRetry:
 
         mock_client.chat.completions.create.side_effect = [error, error, error]
 
-        config = {"llm": {"provider": "claude", "model": "claude-sonnet-4-6"}}
+        config = {"llm": {"base_url": "anthropic", "model": "claude-sonnet-4-6"}}
         with pytest.raises(APIStatusError):
             generate("sys", "usr", config)
 
@@ -225,7 +290,7 @@ class TestRetry:
 
         mock_client.chat.completions.create.side_effect = error
 
-        config = {"llm": {"provider": "claude", "model": "claude-sonnet-4-6"}}
+        config = {"llm": {"base_url": "anthropic", "model": "claude-sonnet-4-6"}}
         with pytest.raises(APIStatusError):
             generate("sys", "usr", config)
 
@@ -237,24 +302,24 @@ class TestRetry:
 
 class TestAPIKeyChecks:
     @patch.dict("os.environ", {}, clear=True)
-    def test_missing_api_key_raises_for_claude(self):
+    def test_missing_api_key_raises_for_remote_url(self):
         from readpile.sync.llm import generate
 
-        config = {"llm": {"provider": "claude", "model": "claude-sonnet-4-6"}}
+        config = {"llm": {"base_url": "anthropic", "model": "claude-sonnet-4-6"}}
         with pytest.raises(RuntimeError, match="READPILE_LLM_API_KEY"):
             generate("sys", "usr", config)
 
     @patch.dict("os.environ", {}, clear=True)
-    def test_missing_api_key_raises_for_openai(self):
+    def test_missing_api_key_raises_for_no_base_url(self):
         from readpile.sync.llm import generate
 
-        config = {"llm": {"provider": "openai", "model": "gpt-4o"}}
+        config = {"llm": {"model": "gpt-4o"}}
         with pytest.raises(RuntimeError, match="READPILE_LLM_API_KEY"):
             generate("sys", "usr", config)
 
     @patch.dict("os.environ", {}, clear=True)
     @patch("openai.OpenAI")
-    def test_ollama_skips_api_key_check(self, mock_openai_cls):
+    def test_local_url_skips_api_key_check(self, mock_openai_cls):
         from readpile.sync.llm import generate
 
         mock_client = MagicMock()
@@ -263,7 +328,7 @@ class TestAPIKeyChecks:
             choices=[MagicMock(message=MagicMock(content="local response"))]
         )
 
-        config = {"llm": {"provider": "ollama", "model": "llama3"}}
+        config = {"llm": {"base_url": "ollama", "model": "llama3"}}
         result = generate("sys", "usr", config)
         assert result == "local response"
 
@@ -280,7 +345,7 @@ class TestAPIKeyChecks:
 
         config = {
             "llm": {
-                "provider": "claude",
+                "base_url": "anthropic",
                 "model": "claude-sonnet-4-6",
                 "api_key": "from-config",
             }

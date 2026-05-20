@@ -31,13 +31,13 @@ def wiki_dir(tmp_path: Path) -> Path:
     return wiki
 
 
-def _write_state(state_dir: Path, feeds: dict | None = None) -> None:
+def _write_state(state_dir: Path, feeds: dict | None = None, saved_urls: list | None = None) -> None:
     data = {
         "version": 1,
         "last_sync": None,
         "email": {"seen_ids": []},
         "feeds": feeds or {},
-        "saved_urls": [],
+        "saved_urls": saved_urls or [],
         "synthesis": {
             "pending": {},
             "synthesized": {},
@@ -133,7 +133,7 @@ class TestFiltersSeenURLs:
                 "seen_urls": ["https://example.com/post-0", "https://example.com/post-1"],
                 "consecutive_failures": 0,
             },
-        })
+        }, saved_urls=["https://example.com/post-0", "https://example.com/post-1"])
         feed = _make_feed()
         entries = _make_feed_entries(3)
         feed_info = _make_feed_info()
@@ -339,6 +339,131 @@ class TestYouTubeFeedResolvesURL:
         # crawl_rss_detailed should be called with the resolved feed URL
         call_args = mock_crawl.call_args
         assert call_args[0][0] == resolved_feed
+
+
+class TestMixedFeedContentTypes:
+    """Per-entry type determines content_type, not the feed-level kind."""
+
+    @pytest.mark.asyncio
+    async def test_podcast_feed_with_articles(self, state_dir, wiki_dir):
+        """Blog posts in a podcast feed get content_type='article', not 'podcast'."""
+        _write_state(state_dir)
+        feed = _make_feed(kind="podcast")
+        entries = [
+            {
+                "title": "Episode 1",
+                "url": "https://example.com/ep1",
+                "date": "2025-05-10",
+                "author": "Author",
+                "type": "audio",
+                "audio_url": "https://example.com/ep1.mp3",
+                "duration": "30:00",
+                "description": "A podcast episode",
+            },
+            {
+                "title": "Blog Post 1",
+                "url": "https://example.com/post1",
+                "date": "2025-05-11",
+                "author": "Author",
+                "type": "article",
+                "audio_url": None,
+                "duration": None,
+                "description": "A blog post",
+            },
+        ]
+        feed_info = _make_feed_info()
+
+        from readpile.sync.state import SyncState
+        from readpile.sync.feeds import FeedProcessor
+
+        state = SyncState(state_dir / "sync-state.json", wiki_dir=wiki_dir)
+
+        with patch(
+            "readpile.crawlers.rss.crawl_rss_detailed",
+            return_value=(feed_info, entries),
+        ):
+            processor = FeedProcessor([feed], state, {}, registry=None)
+            results = await processor.check_all()
+
+        assert len(results) == 2
+        by_url = {r.url: r for r in results}
+        assert by_url["https://example.com/ep1"].content_type == "podcast"
+        assert by_url["https://example.com/post1"].content_type == "article"
+
+    @pytest.mark.asyncio
+    async def test_rss_feed_with_audio(self, state_dir, wiki_dir):
+        """Audio entries in an RSS feed get content_type='podcast'."""
+        _write_state(state_dir)
+        feed = _make_feed(kind="rss")
+        entries = [
+            {
+                "title": "Episode 1",
+                "url": "https://example.com/ep1",
+                "date": "2025-05-10",
+                "author": "Author",
+                "type": "audio",
+                "audio_url": "https://example.com/ep1.mp3",
+                "duration": "30:00",
+                "description": "A podcast episode",
+            },
+            {
+                "title": "Blog Post 1",
+                "url": "https://example.com/post1",
+                "date": "2025-05-11",
+                "author": "Author",
+                "type": "article",
+                "audio_url": None,
+                "duration": None,
+                "description": "A blog post",
+            },
+        ]
+        feed_info = _make_feed_info()
+
+        from readpile.sync.state import SyncState
+        from readpile.sync.feeds import FeedProcessor
+
+        state = SyncState(state_dir / "sync-state.json", wiki_dir=wiki_dir)
+
+        with patch(
+            "readpile.crawlers.rss.crawl_rss_detailed",
+            return_value=(feed_info, entries),
+        ):
+            processor = FeedProcessor([feed], state, {}, registry=None)
+            results = await processor.check_all()
+
+        assert len(results) == 2
+        by_url = {r.url: r for r in results}
+        assert by_url["https://example.com/ep1"].content_type == "podcast"
+        assert by_url["https://example.com/post1"].content_type == "article"
+
+    @pytest.mark.asyncio
+    async def test_youtube_feed_overrides_entry_type(self, state_dir, wiki_dir):
+        """YouTube feeds always get content_type='youtube' regardless of entry type."""
+        _write_state(state_dir)
+        feed = _make_feed(kind="youtube", url="https://youtube.com/@example")
+        entries = _make_feed_entries(2)
+        feed_info = _make_feed_info()
+
+        from readpile.sync.state import SyncState
+        from readpile.sync.feeds import FeedProcessor
+
+        state = SyncState(state_dir / "sync-state.json", wiki_dir=wiki_dir)
+
+        with (
+            patch(
+                "readpile.crawlers.discovery.resolve_youtube_feed",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
+                "readpile.crawlers.rss.crawl_rss_detailed",
+                return_value=(feed_info, entries),
+            ),
+        ):
+            processor = FeedProcessor([feed], state, {}, registry=None)
+            results = await processor.check_all()
+
+        assert all(r.content_type == "youtube" for r in results)
 
 
 class TestSuccessResetsFailures:

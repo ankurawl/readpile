@@ -40,7 +40,7 @@ default_dir = "{wiki_dir}"
 _LLM_TEMPLATE = """\
 
 [llm]
-provider = "{llm_provider}"
+base_url = "{llm_base_url}"
 model = "{llm_model}"
 # API key via env: READPILE_LLM_API_KEY
 """
@@ -76,10 +76,12 @@ wiki_health_day = "saturday"
 # SMTP password via env: READPILE_SMTP_PASSWORD
 """
 
-_LLM_MODELS = {
-    "claude": "claude-sonnet-4-6",
-    "openai": "gpt-4o",
-    "ollama": "llama3",
+_LLM_PRESETS: dict[str, tuple[str, str]] = {
+    "anthropic": ("anthropic", "claude-sonnet-4-6"),
+    "openai": ("", "gpt-4o"),
+    "gemini": ("gemini", "gemini-2.0-flash"),
+    "openrouter": ("openrouter", ""),
+    "ollama": ("ollama", "llama3"),
 }
 
 
@@ -122,16 +124,22 @@ def init() -> None:
     )
 
     typer.echo("")
-    typer.echo("─── LLM Provider ───")
+    typer.echo("─── LLM ───")
     typer.echo("  Used by the sync pipeline for digest grouping and wiki synthesis.")
     typer.echo("  Not needed for content extraction (scrape, transcribe, crawl).")
+    typer.echo("  Any OpenAI-compatible API works. Shortcuts: anthropic, openai, gemini, openrouter, ollama")
     typer.echo("")
 
-    llm_provider = typer.prompt(
-        "LLM provider (claude/openai/ollama)",
-        default="claude",
+    llm_base_url = typer.prompt(
+        "LLM base_url (shortcut name or full URL)",
+        default="anthropic",
     )
-    llm_model = _LLM_MODELS.get(llm_provider, "claude-sonnet-4-6")
+    preset = _LLM_PRESETS.get(llm_base_url)
+    default_model = preset[1] if preset else ""
+    llm_model = typer.prompt(
+        "Model name",
+        default=default_model or "claude-sonnet-4-6",
+    )
 
     typer.echo("")
     typer.echo("─── Email & Digest ───")
@@ -172,7 +180,7 @@ def init() -> None:
         wiki_dir=wiki_dir,
     )
 
-    content += _LLM_TEMPLATE.format(llm_provider=llm_provider, llm_model=llm_model)
+    content += _LLM_TEMPLATE.format(llm_base_url=llm_base_url, llm_model=llm_model)
 
     content += _SYNC_TEMPLATE.format(
         email_enabled=str(email_enabled).lower(),
@@ -212,11 +220,10 @@ def init() -> None:
     env_vars: list[str] = []
     step = 1
 
-    if llm_provider != "ollama":
-        provider_name = "Anthropic" if llm_provider == "claude" else "OpenAI"
-        env_vars.append(f"  export READPILE_LLM_API_KEY='your-{llm_provider}-api-key'")
-        typer.echo(f"{step}. Set your {provider_name} API key (for sync pipeline):")
-        typer.echo(f"     export READPILE_LLM_API_KEY='your-{llm_provider}-api-key'")
+    if llm_base_url != "ollama" and not llm_base_url.startswith("http://localhost"):
+        env_vars.append(f"  export READPILE_LLM_API_KEY='your-api-key'")
+        typer.echo(f"{step}. Set your LLM API key (for sync pipeline):")
+        typer.echo(f"     export READPILE_LLM_API_KEY='your-api-key'")
         typer.echo("")
         step += 1
 

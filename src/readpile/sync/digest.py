@@ -105,16 +105,27 @@ class DigestBuilder:
     def _group_items(self, items: list[dict]) -> dict[str, list[dict]]:
         try:
             from readpile.sync.llm import generate
-            system = "Group the following items into 3-5 coherent topics. Return a JSON object with topic names as keys and lists of item numbers as values."
+            system = (
+                "Group the following items into 3-5 coherent topics. "
+                "Return ONLY a raw JSON object with topic names as keys "
+                "and lists of item numbers (integers) as values. "
+                "No markdown, no code fences, no explanation."
+            )
             item_lines = []
             for i, item in enumerate(items, 1):
                 item_lines.append(f"{i}. {item.get('title', 'Untitled')} ({item.get('content_type', 'article')})")
             user = "\n".join(item_lines)
 
             response = generate(system, user, self.config)
+            if not response or not response.strip():
+                raise ValueError("LLM returned empty response")
 
             import json
-            groups_raw = json.loads(response)
+            import re
+            cleaned = response.strip()
+            cleaned = re.sub(r"^```(?:json)?\s*\n?", "", cleaned)
+            cleaned = re.sub(r"\n?```\s*$", "", cleaned)
+            groups_raw = json.loads(cleaned)
             groups: dict[str, list[dict]] = {}
             for topic, indices in groups_raw.items():
                 topic_items = []

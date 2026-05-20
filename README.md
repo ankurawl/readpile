@@ -94,7 +94,7 @@ Before running `readpile init`, have these ready:
 | What                                                                                                   | Why                                                            | Required?                               |
 | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- | --------------------------------------- |
 | A wiki directory path (e.g. `~/my-wiki`)                                                               | Where your knowledge base lives                                | Yes                                     |
-| An LLM API key ([Anthropic](https://console.anthropic.com/) or [OpenAI](https://platform.openai.com/)) | Powers digest grouping and wiki synthesis in the sync pipeline | Yes, unless using Ollama                |
+| An LLM API key ([Anthropic](https://console.anthropic.com/), [Google AI Studio](https://aistudio.google.com/), [OpenAI](https://platform.openai.com/), [OpenRouter](https://openrouter.ai/), etc.) | Powers digest grouping and wiki synthesis in the sync pipeline | Yes, unless using a local model |
 | A dedicated Gmail address (e.g. `readpile-inbox@gmail.com`)                                            | Collects newsletters and forwarded links                       | No — only if you want email-driven sync |
 | A [Gmail App Password](https://myaccount.google.com/apppasswords) for that Gmail account               | Lets readpile send you digest emails from the readpile inbox   | No — only if you enable email           |
 | [Gmail OAuth credentials](https://console.cloud.google.com/) (JSON file)                               | Lets readpile read that inbox                                  | No — only if you enable email           |
@@ -464,9 +464,19 @@ diarize = false                   # speaker diarization (requires HF_TOKEN)
 default_dir = ""                  # default wiki directory for MCP tools
 
 [llm]
-provider = "claude"               # "claude", "openai", or "ollama"
+base_url = "anthropic"            # shortcut or full URL (see below)
 model = "claude-sonnet-4-6"
 # API key via env: READPILE_LLM_API_KEY
+#
+# Shortcuts: "anthropic", "openai" (empty — SDK default), "gemini",
+#            "openrouter", "ollama" (localhost:11434)
+# Or any OpenAI-compatible URL: "https://my-proxy.example.com/v1"
+#
+# Examples:
+#   base_url = "gemini"             model = "gemini-2.0-flash"
+#   base_url = "openrouter"         model = "google/gemini-2.0-flash"
+#   base_url = "ollama"             model = "llama3"
+#   base_url = ""                   model = "gpt-4o"  (OpenAI default)
 
 [sync]
 synthesis_wait_days = 7           # days before auto-synthesizing unreplied items
@@ -520,7 +530,7 @@ synthesize = false    # save source files but skip wiki synthesis
 
 | Variable | Purpose |
 |----------|---------|
-| `READPILE_LLM_API_KEY` | API key for Claude, OpenAI, or custom LLM provider (used by sync pipeline) |
+| `READPILE_LLM_API_KEY` | API key for your LLM provider (used by sync pipeline). Not needed for local models |
 | `READPILE_SMTP_PASSWORD` | Gmail App Password for the **readpile inbox** (the `from` address in digest config) — lets readpile send digest emails from that account |
 | `HF_TOKEN` | HuggingFace token for speaker diarization |
 | `READPILE_CONFIG` | Override config file path |

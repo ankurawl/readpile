@@ -22,38 +22,116 @@ async def resolve_youtube_feed(url: str) -> str | None:
     except Exception:
         return None
 
-    channel_id = None
-
-    match = re.search(r'"externalId"\s*:\s*"(UC[A-Za-z0-9_-]+)"', html)
-    if match:
-        channel_id = match.group(1)
-
-    if not channel_id:
-        match = re.search(r'"channelId"\s*:\s*"(UC[A-Za-z0-9_-]+)"', html)
-        if match:
-            channel_id = match.group(1)
-
-    if not channel_id:
-        match = re.search(r'youtube\.com/channel/(UC[A-Za-z0-9_-]+)', html)
-        if match:
-            channel_id = match.group(1)
-
-    if not channel_id:
-        from bs4 import BeautifulSoup
-        soup = BeautifulSoup(html, "lxml")
-        canonical = soup.find("link", rel="canonical")
-        if canonical and canonical.get("href"):
-            match = re.search(
-                r'youtube\.com/channel/(UC[A-Za-z0-9_-]+)',
-                canonical["href"],
-            )
-            if match:
-                channel_id = match.group(1)
-
+    channel_id = _extract_channel_id(html)
     if channel_id:
         return f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
 
     return None
+
+
+def _extract_channel_id(html: str) -> str | None:
+    """Extract a YouTube channel ID from page HTML."""
+    import re
+
+    match = re.search(r'"externalId"\s*:\s*"(UC[A-Za-z0-9_-]+)"', html)
+    if match:
+        return match.group(1)
+
+    match = re.search(r'"channelId"\s*:\s*"(UC[A-Za-z0-9_-]+)"', html)
+    if match:
+        return match.group(1)
+
+    match = re.search(r'youtube\.com/channel/(UC[A-Za-z0-9_-]+)', html)
+    if match:
+        return match.group(1)
+
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html, "lxml")
+    canonical = soup.find("link", rel="canonical")
+    if canonical and canonical.get("href"):
+        match = re.search(
+            r'youtube\.com/channel/(UC[A-Za-z0-9_-]+)',
+            canonical["href"],
+        )
+        if match:
+            return match.group(1)
+
+    return None
+
+
+async def scrape_youtube_channel_videos(channel_id: str) -> tuple[str | None, list[dict]]:
+    """Scrape video metadata from a YouTube channel page.
+
+    Fallback for when the RSS feed is unavailable. Returns
+    ``(channel_title, entries)`` where each entry has keys matching the
+    ``crawl_rss_detailed`` output format.
+    """
+    import json
+    import re
+
+    import httpx
+
+    channel_url = f"https://www.youtube.com/channel/{channel_id}/videos"
+
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
+            resp = await client.get(
+                channel_url,
+                headers={"User-Agent": "Mozilla/5.0 (compatible; readpile/0.1)"},
+            )
+            resp.raise_for_status()
+    except Exception:
+        return None, []
+
+    html = resp.text
+
+    match = re.search(r"ytInitialData\s*=\s*(\{.+?\})\s*;\s*</script>", html, re.DOTALL)
+    if not match:
+        return None, []
+
+    try:
+        data = json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return None, []
+
+    channel_title = (
+        data.get("metadata", {})
+        .get("channelMetadataRenderer", {})
+        .get("title")
+    )
+
+    tabs = (
+        data.get("contents", {})
+        .get("twoColumnBrowseResultsRenderer", {})
+        .get("tabs", [])
+    )
+
+    entries: list[dict] = []
+    for tab in tabs:
+        tr = tab.get("tabRenderer", {})
+        items = tr.get("content", {}).get("richGridRenderer", {}).get("contents", [])
+        for item in items:
+            lvm = (
+                item.get("richItemRenderer", {})
+                .get("content", {})
+                .get("lockupViewModel", {})
+            )
+            vid_id = lvm.get("contentId", "")
+            if not vid_id:
+                continue
+
+            meta_vm = lvm.get("metadata", {}).get("lockupMetadataViewModel", {})
+            title = meta_vm.get("title", {}).get("content", "")
+
+            entries.append({
+                "url": f"https://www.youtube.com/watch?v={vid_id}",
+                "title": title,
+                "type": "article",
+            })
+        if entries:
+            break
+
+    return channel_title, entries
 
 
 async def discover_feed(

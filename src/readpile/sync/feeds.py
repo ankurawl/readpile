@@ -12,6 +12,7 @@ from readpile.crawlers import discovery as _discovery
 from readpile.crawlers import rss as _rss
 from readpile.sync.sources import Feed, FeedRegistry
 from readpile.sync.state import SyncState
+from readpile.sync.urls import normalize_url
 
 log = logging.getLogger("readpile.sync")
 
@@ -82,7 +83,7 @@ class FeedProcessor:
     async def check_feed(self, feed: Feed) -> list[FeedResult]:
         feed_url = feed.url
 
-        if feed.kind == "youtube":
+        if feed.kind == "youtube" and "/feeds/videos.xml" not in feed_url:
             resolved = await _discovery.resolve_youtube_feed(feed_url)
             if resolved:
                 feed_url = resolved
@@ -90,6 +91,14 @@ class FeedProcessor:
         feed_info, entries = await asyncio.to_thread(
             _rss.crawl_rss_detailed, feed_url, None,
         )
+
+        if not entries and feed.kind == "youtube":
+            import re
+            match = re.search(r"channel_id=([A-Za-z0-9_-]+)", feed_url)
+            if match:
+                _, entries = await _discovery.scrape_youtube_channel_videos(match.group(1))
+                if entries:
+                    log.info("YouTube RSS unavailable, scraped %d videos from channel page", len(entries))
 
         actual_url = feed_info.get("href") or feed_info.get("feed_url", "")
         if actual_url and actual_url != feed.url and self.registry:
@@ -114,16 +123,17 @@ class FeedProcessor:
             entry_url = entry.get("url", "")
             if not entry_url:
                 continue
-            if self.state.is_url_seen(entry_url, feed.url):
+            if self.state.is_url_seen(entry_url, feed.url) and self.state.is_saved_url(normalize_url(entry_url)):
                 continue
 
             self.state.mark_url_seen(entry_url, feed.url)
 
-            ct = "article"
             if feed.kind == "youtube":
                 ct = "youtube"
-            elif feed.kind == "podcast":
+            elif entry.get("type") == "audio":
                 ct = "podcast"
+            else:
+                ct = "article"
 
             results.append(FeedResult(
                 source=feed,

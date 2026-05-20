@@ -147,6 +147,17 @@ def feeds_add(
                 source_name = feed.feed["title"]
         except Exception:
             pass
+        if source_name == feed_url and detected_kind == "youtube":
+            try:
+                import re
+                match = re.search(r"channel_id=([A-Za-z0-9_-]+)", feed_url)
+                if match:
+                    from readpile.crawlers.discovery import scrape_youtube_channel_videos
+                    title, _ = asyncio.run(scrape_youtube_channel_videos(match.group(1)))
+                    if title:
+                        source_name = title
+            except Exception:
+                pass
 
     typer.echo(f"Auto-detected: {detected_kind}")
     typer.echo(f'Name: "{source_name}"')

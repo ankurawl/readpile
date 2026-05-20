@@ -47,7 +47,7 @@ def config(state_dir: Path, tmp_path: Path) -> dict:
             "max_auto_synthesize_per_run": 20,
         },
         "llm": {
-            "provider": "ollama",
+            "base_url": "ollama",
             "model": "test-model",
         },
     }

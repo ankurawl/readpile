@@ -248,9 +248,11 @@ The sync module (`src/readpile/sync/`) contains:
 
 ```toml
 [llm]
-provider = "claude"
+base_url = "anthropic"
 model = "claude-sonnet-4-6"
 # API key via env: READPILE_LLM_API_KEY
+# Shortcuts: anthropic, openai, gemini, openrouter, ollama
+# Or any OpenAI-compatible URL
 
 [sync]
 synthesis_wait_days = 7

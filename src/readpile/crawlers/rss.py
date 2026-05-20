@@ -43,6 +43,11 @@ def crawl_rss(url: str, recent: int | None = None) -> list[str]:
 
     feed = feedparser.parse(url)
 
+    status = getattr(feed, "status", None)
+    if isinstance(status, int) and status >= 400:
+        logger.warning(f"Feed at {url} returned HTTP {status}")
+        return []
+
     if feed.bozo and not feed.entries:
         logger.warning(f"Malformed or empty feed at {url}: {feed.bozo_exception}")
         return []
@@ -155,6 +160,11 @@ def crawl_rss_detailed(
     _check_deps()
 
     feed = feedparser.parse(url)
+
+    status = getattr(feed, "status", None)
+    if isinstance(status, int) and status >= 400:
+        logger.warning(f"Feed at {url} returned HTTP {status}")
+        return {"feed_title": None, "feed_description": None, "episode_count": 0}, []
 
     if feed.bozo and not feed.entries:
         logger.warning(f"Malformed or empty feed at {url}: {feed.bozo_exception}")

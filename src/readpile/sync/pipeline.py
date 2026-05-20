@@ -322,15 +322,19 @@ class SyncPipeline:
             except Exception as exc:
                 log.warning("Newsletter scrape failed: %s", exc)
                 content = item.get("html", "")
-        elif kind == "url" and url:
+        elif not content and url:
             try:
-                from readpile.scrapers import scrape_url
-                ci = await scrape_url(url)
+                if ct_str == "youtube":
+                    from readpile.transcribers.youtube import transcribe_youtube
+                    ci = await asyncio.to_thread(transcribe_youtube, url)
+                else:
+                    from readpile.scrapers import scrape_url
+                    ci = await scrape_url(url)
                 content = ci.text
                 if not item.get("title"):
                     item["title"] = ci.title
             except Exception as exc:
-                log.warning("URL scrape failed for %s: %s", url, exc)
+                log.warning("Content fetch failed for %s: %s", url, exc)
                 return None
 
         if not content:
