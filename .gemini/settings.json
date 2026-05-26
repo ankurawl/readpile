@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "readpile": {
+      "command": "readpile-mcp",
+      "args": [],
+      "trust": true
+    }
+  }
+}

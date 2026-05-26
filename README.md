@@ -170,12 +170,14 @@ Every capability is available both as a CLI command and as an MCP tool. The CLI 
 |------------|-----|-----|-------------|
 | Create wiki | `readpile init` or `readpile wiki init PATH` | `wiki_init(path, name, ...)` | `readpile init` creates one automatically; use `wiki init` for additional wikis |
 | Save source file | — | `wiki_save_source(content, title, ...)` | Save raw content to the wiki's `sources/` directory |
-| Read | — | `wiki_read(page)` | Read a wiki page, source file, index, log, or conventions |
+| Read | `readpile wiki read ID` | `wiki_read(page)` | Read a wiki page, source file, index, log, or conventions |
 | Write | — | `wiki_write(content, page, rebuild_index)` | Create or update a wiki page with frontmatter validation |
-| List pages | `readpile wiki list` | `wiki_list(category)` | List all wiki pages with metadata |
+| List pages | `readpile wiki list` | `wiki_list(category)` | List all wiki pages with metadata (enumerated in CLI) |
 | Search | `readpile wiki search QUERY` | `wiki_search(query, scope)` | Full-text search across pages and/or source files |
 | Log | `readpile wiki log` | `wiki_log(entry)` | Append a timestamped entry to the operation log |
-| Delete | — | `wiki_delete(page)` | Delete a wiki page and rebuild the index |
+| Delete page | `readpile wiki rm ID` | `wiki_delete(page)` | Delete a wiki page and rebuild the index |
+| List sources | `readpile wiki sources` | — | List all saved sources in the wiki (enumerated) |
+| Delete source | `readpile wiki rm-source ID` | — | Delete a saved source file |
 
 ### Sync pipeline
 
@@ -188,6 +190,16 @@ Every capability is available both as a CLI command and as an MCP tool. The CLI 
 | Remove feed | `readpile feeds remove IDS` | Remove feed(s) by index (e.g. `1,3-5`) or name |
 | Enable feed | `readpile feeds enable NAME` | Re-enable a disabled feed |
 | Status | `readpile status` | Overview: last sync, pending count, feed health |
+
+### Cleanup & Administration
+
+| Capability | CLI | Description |
+|------------|-----|-------------|
+| Clean pages | `readpile clean pages` | Delete all wiki pages and rebuild index |
+| Clean sources | `readpile clean sources` | Delete all saved sources |
+| Clean feeds | `readpile clean feeds` | Clear all feed subscriptions |
+| Clean configs | `readpile clean configs` | Delete the entire `~/.readpile` directory |
+| Total cleanup | `readpile clean all` | Execute all clean commands (feeds, pages, sources, configs) |
 
 ### Crawl modes
 

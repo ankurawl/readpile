@@ -33,7 +33,7 @@ Test markers:
 
 ```
 src/readpile/
-├── cli/             # CLI entry points (main.py parent app, wiki.py, sync.py)
+├── cli/             # CLI entry points (main.py parent app, wiki.py, sync.py, clean.py)
 ├── scrapers/        # Article + webpage content extraction
 ├── transcribers/    # YouTube captions + Whisper audio transcription
 ├── crawlers/        # RSS, blog, site, discovery (feed/podcast/YouTube resolution)
@@ -56,7 +56,7 @@ src/readpile/
 
 **`ContentItem`** (`core/models.py`) — Every piece of extracted content is a `ContentItem` with a `to_yaml_header()` and `to_stdout()` method. All tools produce and consume this format.
 
-**`WikiStore`** (`wiki/store.py`) — Single class for all wiki operations. Methods: `init()`, `read_page()`, `write_page()`, `save_source()`, `list_pages()`, `search()`, `append_log()`, `delete_page()`, `build_index()`.
+**`WikiStore`** (`wiki/store.py`) — Single class for all wiki operations. Methods: `init()`, `read_page()`, `write_page()`, `save_source()`, `list_pages()`, `list_sources()`, `search()`, `append_log()`, `delete_page()`, `delete_source()`, `build_index()`.
 
 **`Archiver`** (`core/archiver.py`) — Handles filename sanitization (`YYYY-MM-DD_title-slug.md`) and file writing. Used by both the `archive` command and `WikiStore.save_source()`.
 

@@ -101,14 +101,23 @@ crawl URL                  # Discover content URLs
 content URL                # Auto-detect and extract
 readpile init              # Generate config + create wiki
 readpile wiki init PATH    # Create an additional wiki
-readpile wiki list         # List wiki pages
+readpile wiki list         # List wiki pages (enumerated)
+readpile wiki read ID      # Read wiki page or source content (by index or name)
+readpile wiki rm ID        # Delete a wiki page (by index or name)
 readpile wiki search QUERY # Search wiki pages
+readpile wiki sources      # List saved sources (enumerated)
+readpile wiki rm-source ID # Delete a saved source (by index or name)
 readpile wiki log          # View wiki log
 readpile sync              # Check email + subscriptions, send digest
 readpile synthesize        # Synthesize source files into wiki pages
 readpile feeds add URL   # Add a feed subscription (updates existing if URL matches)
 readpile feeds list      # List feed subscriptions with serial numbers
 readpile feeds remove ID   # Remove feed(s) by index (1, 3-5) or name
+readpile clean pages     # Mass delete wiki pages
+readpile clean sources   # Mass delete wiki sources
+readpile clean feeds     # Mass delete feed subscriptions
+readpile clean configs   # Mass delete ~/.readpile directory
+readpile clean all       # Total cleanup (feeds, pages, sources, configs)
 readpile status            # Show sync overview
 ```
 
