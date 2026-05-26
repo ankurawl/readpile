@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -40,12 +41,14 @@ class SiteCrawler:
         scope: str = "prefix",
         headless: bool = True,
         max_pages: int | None = None,
+        delay: float = 0.0,
     ):
         self.base_url = base_url
         self.max_depth = max_depth
         self.scope = scope
         self.headless = headless
         self.max_pages = max_pages
+        self.delay = delay
 
     async def crawl(self) -> list[str]:
         """BFS crawl returning a sorted list of discovered URLs."""
@@ -90,6 +93,10 @@ class SiteCrawler:
                     clean = url.split("#")[0].split("?")[0].rstrip("/")
                     if clean in visited or depth > self.max_depth:
                         continue
+
+                    if self.delay > 0 and len(visited) > 0:
+                        await asyncio.sleep(self.delay)
+
                     visited.add(clean)
 
                     try:

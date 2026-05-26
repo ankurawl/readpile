@@ -83,6 +83,18 @@ def _validate_path(name: str, wiki_dir: Path) -> None:
         raise ValueError(f"Invalid page name: {name!r} — directory traversal is not allowed")
 
 
+def _normalize_name(name: str, wiki_dir: Path) -> str:
+    """If name is an absolute path within wiki_dir, convert to relative."""
+    try:
+        p = Path(name)
+        if p.is_absolute():
+            # If it's absolute, try to make it relative to the root
+            return str(p.relative_to(wiki_dir))
+    except (ValueError, TypeError):
+        pass
+    return name
+
+
 class WikiStore:
     """All wiki operations on a single directory."""
 
@@ -161,6 +173,16 @@ class WikiStore:
         return self.conventions_path.read_text(encoding="utf-8")
 
     def read_page(self, name: str) -> str:
+        """Read a wiki page or source by name or absolute path.
+
+        Accepts:
+          - Reserved names: 'index', 'log', 'conventions'
+          - Relative page names: 'my-page' or 'my-page.md'
+          - Relative source paths: 'sources/article.md'
+          - Absolute paths residing within the wiki directory.
+        """
+        name = _normalize_name(name, self.wiki_dir)
+
         if name == "index":
             return self.index_path.read_text(encoding="utf-8")
         if name == "log":
@@ -181,6 +203,10 @@ class WikiStore:
                 raise FileNotFoundError(f"Source not found: {name}")
             return source_path.read_text(encoding="utf-8")
 
+        # Strip pages/ prefix if it was normalized from an absolute path
+        if name.startswith("pages/"):
+            name = name[len("pages/"):]
+
         _validate_path(name, self.wiki_dir)
         if not name.endswith(".md"):
             name += ".md"
@@ -198,6 +224,16 @@ class WikiStore:
         content: str,
         rebuild_index: bool = True,
     ) -> Path:
+        """Write a wiki page from markdown content.
+
+        The `name` can be a relative page name or an absolute path within
+        the wiki directory. If None, it is derived from the page title.
+        """
+        if name is not None:
+            name = _normalize_name(name, self.wiki_dir)
+            if name.startswith("pages/"):
+                name = name[len("pages/"):]
+
         page = WikiPage.from_markdown(content)
 
         config = self.load_config()
@@ -239,6 +275,11 @@ class WikiStore:
         return page_path
 
     def delete_page(self, name: str) -> None:
+        """Delete a wiki page by name or absolute path."""
+        name = _normalize_name(name, self.wiki_dir)
+        if name.startswith("pages/"):
+            name = name[len("pages/"):]
+
         reserved = {"log", "index", "conventions"}
         clean_name = name.removesuffix(".md")
         if clean_name in reserved:
@@ -264,6 +305,49 @@ class WikiStore:
         page_path.unlink()
         index_content = self.build_index()
         self.index_path.write_text(index_content, encoding="utf-8")
+
+    def list_sources(self) -> list[dict]:
+        """List all sources with metadata."""
+        if not self.sources_dir.exists():
+            return []
+
+        sources: list[dict] = []
+        for path in sorted(self.sources_dir.glob("*.md")):
+            try:
+                # Sources don't necessarily have WikiPage frontmatter,
+                # but we can try to get basic info.
+                sources.append({
+                    "name": path.stem,
+                    "path": str(path.relative_to(self.wiki_dir)),
+                    "size": path.stat().st_size,
+                    "modified": datetime.fromtimestamp(
+                        path.stat().st_mtime, tz=timezone.utc
+                    ).isoformat(),
+                })
+            except Exception:
+                continue
+        return sources
+
+    def delete_source(self, name: str) -> None:
+        """Delete a source file by name or relative path."""
+        name = _normalize_name(name, self.wiki_dir)
+        if name.startswith("sources/"):
+            name = name[len("sources/"):]
+
+        _validate_path(name, self.wiki_dir)
+        if not name.endswith(".md"):
+            name += ".md"
+
+        source_path = self.sources_dir / name
+        resolved = source_path.resolve()
+        if not str(resolved).startswith(str(self.wiki_dir)):
+            raise ValueError(f"Invalid source path: {name!r}")
+
+        if not source_path.exists():
+            raise FileNotFoundError(f"Source not found: {name}")
+
+        source_path.unlink()
+
 
     def save_source(
         self,

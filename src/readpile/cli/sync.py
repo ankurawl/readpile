@@ -164,8 +164,13 @@ def feeds_add(
 
     new_feed = Feed(name=source_name, url=feed_url, kind=detected_kind)
     registry.load()
-    registry.add(new_feed)
-    typer.echo("Added to feeds.toml")
+    status = registry.add(new_feed)
+    if status == "added":
+        typer.echo("Added to feeds.toml")
+    elif status == "updated":
+        typer.echo("Updated existing feed in feeds.toml")
+    else:
+        typer.echo("Feed already exists and is up to date.")
 
 
 @feeds_app.command("list")
@@ -182,20 +187,20 @@ def feeds_list() -> None:
         typer.echo("No feeds configured.")
         return
 
-    for f in feeds:
+    for i, f in enumerate(feeds, 1):
         status = ""
         if f.disabled:
             status = " [disabled]"
         elif not f.synthesize:
             status = " [no-synth]"
-        typer.echo(f"  {f.name} ({f.kind}) — {f.url}{status}")
+        typer.echo(f"  {i}. {f.name} ({f.kind}) — {f.url}{status}")
 
 
 @feeds_app.command("remove")
 def feeds_remove(
-    name: str = typer.Argument(..., help="Feed name to remove"),
+    identifiers: str = typer.Argument(..., help="Feed name or comma/hyphen-separated indices to remove"),
 ) -> None:
-    """Remove a feed subscription."""
+    """Remove feed subscriptions."""
     from readpile.core.config import get_config_path
     from readpile.sync.sources import FeedRegistry
 
@@ -204,13 +209,49 @@ def feeds_remove(
         config_dir / "feeds.toml",
         config_dir / "sync.lock",
     )
-    registry.load()
-    try:
-        registry.remove(name)
-        typer.echo(f"Removed: {name}")
-    except KeyError:
-        typer.echo(f"Feed not found: {name}", err=True)
-        raise typer.Exit(code=1)
+    feeds = registry.load()
+
+    # Parse indices
+    indices = set()
+    for part in identifiers.split(','):
+        part = part.strip()
+        if not part:
+            continue
+        if '-' in part:
+            try:
+                start_s, end_s = part.split('-', 1)
+                start, end = int(start_s), int(end_s)
+                indices.update(range(start, end + 1))
+            except ValueError:
+                pass
+        else:
+            try:
+                indices.add(int(part))
+            except ValueError:
+                pass
+
+    valid_indices = {i for i in indices if 1 <= i <= len(feeds)}
+    urls_to_remove = []
+
+    if valid_indices:
+        for i in sorted(valid_indices):
+            urls_to_remove.append(feeds[i - 1].url)
+    else:
+        # Fallback to name-based match
+        matched = [f.url for f in feeds if f.name == identifiers]
+        if not matched:
+            typer.echo(f"Feed not found: {identifiers}", err=True)
+            raise typer.Exit(code=1)
+        urls_to_remove.extend(matched)
+
+    for url in urls_to_remove:
+        try:
+            # Re-load or find feed for message
+            feed = next(f for f in feeds if f.url == url)
+            registry.remove_by_url(url)
+            typer.echo(f"Removed: {feed.name} ({url})")
+        except (KeyError, StopIteration):
+            pass
 
 
 @feeds_app.command("enable")

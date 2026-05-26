@@ -2,12 +2,48 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import logging
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from readpile.core.models import ContentItem
 
+log = logging.getLogger("readpile.sync")
+
 _MIN_ARTICLE_LENGTH = 200
+
+# Global Playwright state for batch processing
+_playwright_instance = None
+_browser_instance = None
+
+
+async def _get_browser():
+    """Lazily initialize and return a shared Playwright browser instance."""
+    global _playwright_instance, _browser_instance
+    if _browser_instance is None:
+        from playwright.async_api import async_playwright
+        from readpile.core.browser import launch_chromium
+        
+        _playwright_instance = await async_playwright().start()
+        _browser_instance = await launch_chromium(_playwright_instance, headless=True)
+    return _browser_instance
+
+
+async def cleanup_browser():
+    """Close the shared Playwright browser and stop the playwright instance."""
+    global _playwright_instance, _browser_instance
+    if _browser_instance:
+        try:
+            await _browser_instance.close()
+        except Exception:
+            pass
+        _browser_instance = None
+    if _playwright_instance:
+        try:
+            await _playwright_instance.stop()
+        except Exception:
+            pass
+        _playwright_instance = None
 
 
 async def scrape_url(url: str) -> ContentItem:
@@ -27,6 +63,8 @@ async def scrape_url(url: str) -> ContentItem:
             pass
         elif "Executable doesn't exist" in str(exc) or "browser" in str(exc).lower():
             pass
+        elif "Event loop is closed" in str(exc):
+            log.warning("Playwright event loop closed unexpectedly, falling back to httpx")
         else:
             raise
     return await _scrape_with_httpx(url)
@@ -34,35 +72,32 @@ async def scrape_url(url: str) -> ContentItem:
 
 async def _scrape_with_playwright(url: str) -> ContentItem:
     """Scrape using Playwright (full browser rendering)."""
-    from playwright.async_api import async_playwright
-
-    from readpile.core.browser import launch_chromium
     from readpile.scrapers.article import scrape_article
     from readpile.scrapers.webpage import scrape_webpage
 
-    async with async_playwright() as pw:
-        browser = await launch_chromium(pw, headless=True)
-        context = await browser.new_context()
-        page = await context.new_page()
+    browser = await _get_browser()
+    context = await browser.new_context()
+    page = await context.new_page()
 
+    try:
+        await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+        await page.wait_for_timeout(2000)
+
+        html = await page.content()
+
+        item: ContentItem | None = None
         try:
-            await page.goto(url, wait_until="domcontentloaded")
-            await page.wait_for_timeout(2000)
+            item = scrape_article(url, html)
+        except Exception:
+            item = None
 
-            html = await page.content()
+        if item is None or len(item.text.strip()) < _MIN_ARTICLE_LENGTH:
+            item = await scrape_webpage(url, page)
 
-            item: ContentItem | None = None
-            try:
-                item = scrape_article(url, html)
-            except Exception:
-                item = None
-
-            if item is None or len(item.text.strip()) < _MIN_ARTICLE_LENGTH:
-                item = await scrape_webpage(url, page)
-
-            return item
-        finally:
-            await browser.close()
+        return item
+    finally:
+        await page.close()
+        await context.close()
 
 
 async def _scrape_with_httpx(url: str) -> ContentItem:

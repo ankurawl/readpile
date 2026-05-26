@@ -150,6 +150,22 @@ class TestReadPage:
         with pytest.raises(ValueError, match="traversal"):
             store.read_page("/etc/passwd")
 
+    def test_accepts_absolute_path_inside_wiki(self, tmp_path):
+        store = WikiStore(tmp_path / "wiki")
+        store.init("Wiki")
+        
+        # Test absolute path to a page
+        store.write_page("my-page", _make_page(title="Absolute Test"))
+        abs_page_path = (store.pages_dir / "my-page.md").resolve()
+        result = store.read_page(str(abs_page_path))
+        assert "Absolute Test" in result
+        
+        # Test absolute path to a source
+        source_path = store.sources_dir / "raw.md"
+        source_path.write_text("raw source content")
+        result = store.read_page(str(source_path.resolve()))
+        assert "raw source content" in result
+
 
 class TestWritePage:
     def test_writes_valid_page(self, tmp_path):
@@ -200,6 +216,15 @@ class TestWritePage:
         store.init("Wiki")
         with pytest.raises(ValueError, match="traversal"):
             store.write_page("../../evil", _make_page())
+
+    def test_accepts_absolute_path_inside_wiki(self, tmp_path):
+        store = WikiStore(tmp_path / "wiki")
+        store.init("Wiki")
+        abs_path = (store.pages_dir / "abs-write.md").resolve()
+        path = store.write_page(str(abs_path), _make_page(title="Abs Write"))
+        assert path.exists()
+        assert path.name == "abs-write.md"
+        assert "Abs Write" in path.read_text()
 
     def test_auto_rebuilds_index(self, tmp_path):
         store = WikiStore(tmp_path / "wiki")
@@ -262,6 +287,14 @@ class TestDeletePage:
         store.init("Wiki")
         with pytest.raises(ValueError, match="traversal"):
             store.delete_page("../../evil")
+
+    def test_accepts_absolute_path_inside_wiki(self, tmp_path):
+        store = WikiStore(tmp_path / "wiki")
+        store.init("Wiki")
+        store.write_page("to-delete", _make_page())
+        abs_path = (store.pages_dir / "to-delete.md").resolve()
+        store.delete_page(str(abs_path))
+        assert not abs_path.exists()
 
 
 class TestSaveSource:

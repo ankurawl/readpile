@@ -384,9 +384,12 @@ def _transcribe_whisperx(
         return_char_alignments=False,
     )
 
-    # Diarize if requested and HF_TOKEN available
+    # Diarize if requested and hf_token available in config
     if do_diarize:
-        hf_token = os.environ.get("HF_TOKEN", "")
+        from readpile.core.config import load_config
+        config = load_config()
+        hf_token = config.get("transcribe", {}).get("hf_token", "")
+
         if hf_token:
             logger.info("Running speaker diarization...")
             try:
@@ -401,8 +404,8 @@ def _transcribe_whisperx(
                 )
         else:
             logger.warning(
-                "No HF_TOKEN set. Skipping speaker diarization. "
-                "Set HF_TOKEN env var for speaker identification."
+                "No hf_token set in config. Skipping speaker diarization. "
+                "Set [transcribe] hf_token in ~/.readpile/config.toml for speaker identification."
             )
 
     return _segments_to_dicts(result.get("segments", []))

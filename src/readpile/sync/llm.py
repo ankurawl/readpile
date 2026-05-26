@@ -44,11 +44,11 @@ def generate(system_prompt: str, user_prompt: str, config: dict) -> str:
     if base_url in _BASE_URL_SHORTCUTS:
         base_url = _BASE_URL_SHORTCUTS[base_url]
 
-    api_key = os.environ.get("READPILE_LLM_API_KEY") or llm_cfg.get("api_key", "")
+    api_key = llm_cfg.get("api_key", "")
     if not api_key and not _is_local_url(base_url):
         raise RuntimeError(
-            "READPILE_LLM_API_KEY environment variable is required "
-            "(or set api_key in [llm] config)"
+            "llm api_key is required in ~/.readpile/config.toml "
+            "(under [llm])"
         )
 
     client_kwargs: dict = {"api_key": api_key or "not-needed"}
@@ -71,7 +71,25 @@ def generate(system_prompt: str, user_prompt: str, config: dict) -> str:
         except APIStatusError as exc:
             if exc.status_code in _TRANSIENT_STATUS_CODES:
                 last_exc = exc
-                delay = _BACKOFF_SECONDS[attempt] if attempt < len(_BACKOFF_SECONDS) else _BACKOFF_SECONDS[-1]
+                
+                # Check for provider-suggested delay
+                retry_delay = None
+                try:
+                    # Some providers (like Gemini) return retry information in the error body
+                    if hasattr(exc, "response") and exc.response:
+                        error_json = exc.response.json()
+                        # Gemini structure: error.details[].retryInfo.retryDelay
+                        for detail in error_json.get("error", {}).get("details", []):
+                            if "@type" in detail and "RetryInfo" in detail["@type"]:
+                                delay_str = detail.get("retryDelay", "")
+                                if delay_str.endswith("s"):
+                                    retry_delay = int(float(delay_str[:-1]))
+                                    break
+                except (AttributeError, ValueError, KeyError):
+                    pass
+
+                delay = retry_delay or (_BACKOFF_SECONDS[attempt] if attempt < len(_BACKOFF_SECONDS) else _BACKOFF_SECONDS[-1])
+                
                 log.warning("LLM API returned %d, retrying in %ds (attempt %d/%d)", exc.status_code, delay, attempt + 1, _MAX_RETRIES)
                 time.sleep(delay)
                 continue

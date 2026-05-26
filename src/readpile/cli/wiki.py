@@ -60,8 +60,130 @@ def list_pages(
     if not pages:
         typer.echo("No pages found.")
         return
-    for p in pages:
-        typer.echo(f"{p['name']} — {p['title']} [{p['category']}]")
+    for i, p in enumerate(pages, 1):
+        typer.echo(f"  {i}. {p['name']} — {p['title']} [{p['category']}]")
+
+
+@app.command("read")
+def read_page(
+    identifier: str = typer.Argument(..., help="Page name or list index (e.g. 1)"),
+    wiki: Optional[str] = typer.Option(None, "--wiki", help="Wiki directory."),
+) -> None:
+    """Read a wiki page or source content."""
+    from readpile.wiki import WikiStore
+
+    path = _resolve_wiki(wiki)
+    store = WikiStore(path)
+    if not store.exists():
+        typer.echo(f"Error: No wiki found at {path}.", err=True)
+        raise typer.Exit(1)
+
+    # Try as index
+    try:
+        idx = int(identifier)
+        pages = store.list_pages()
+        if 1 <= idx <= len(pages):
+            identifier = pages[idx - 1]["name"]
+    except ValueError:
+        pass
+
+    try:
+        text = store.read_page(identifier)
+        typer.echo(text)
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+
+
+@app.command("rm")
+def delete_page(
+    identifier: str = typer.Argument(..., help="Page name or list index to delete."),
+    wiki: Optional[str] = typer.Option(None, "--wiki", help="Wiki directory."),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation."),
+) -> None:
+    """Delete a wiki page."""
+    from readpile.wiki import WikiStore
+
+    path = _resolve_wiki(wiki)
+    store = WikiStore(path)
+    if not store.exists():
+        typer.echo(f"Error: No wiki found at {path}.", err=True)
+        raise typer.Exit(1)
+
+    # Try as index
+    try:
+        idx = int(identifier)
+        pages = store.list_pages()
+        if 1 <= idx <= len(pages):
+            identifier = pages[idx - 1]["name"]
+    except ValueError:
+        pass
+
+    if not force:
+        typer.confirm(f"Are you sure you want to delete page '{identifier}'?", abort=True)
+
+    try:
+        store.delete_page(identifier)
+        typer.echo(f"Deleted page: {identifier}")
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+
+
+@app.command("sources")
+def list_sources(
+    wiki: Optional[str] = typer.Option(None, "--wiki", help="Wiki directory."),
+) -> None:
+    """List all saved sources in the wiki."""
+    from readpile.wiki import WikiStore
+
+    path = _resolve_wiki(wiki)
+    store = WikiStore(path)
+    if not store.exists():
+        typer.echo(f"Error: No wiki found at {path}.", err=True)
+        raise typer.Exit(1)
+
+    sources = store.list_sources()
+    if not sources:
+        typer.echo("No sources found.")
+        return
+    for i, s in enumerate(sources, 1):
+        typer.echo(f"  {i}. {s['name']} ({s['size']} bytes) — {s['modified']}")
+
+
+@app.command("rm-source")
+def delete_source(
+    identifier: str = typer.Argument(..., help="Source name or list index to delete."),
+    wiki: Optional[str] = typer.Option(None, "--wiki", help="Wiki directory."),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation."),
+) -> None:
+    """Delete a saved source."""
+    from readpile.wiki import WikiStore
+
+    path = _resolve_wiki(wiki)
+    store = WikiStore(path)
+    if not store.exists():
+        typer.echo(f"Error: No wiki found at {path}.", err=True)
+        raise typer.Exit(1)
+
+    # Try as index
+    try:
+        idx = int(identifier)
+        sources = store.list_sources()
+        if 1 <= idx <= len(sources):
+            identifier = sources[idx - 1]["name"]
+    except ValueError:
+        pass
+
+    if not force:
+        typer.confirm(f"Are you sure you want to delete source '{identifier}'?", abort=True)
+
+    try:
+        store.delete_source(identifier)
+        typer.echo(f"Deleted source: {identifier}")
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
 
 
 @app.command()

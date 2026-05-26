@@ -82,6 +82,71 @@ class TestLoad:
 # --- Add feed round-trip ---
 
 
+    def test_load_deduplicates_on_load(self, tmp_path):
+        feeds_file = tmp_path / "feeds.toml"
+        # Manually write duplicates
+        content = (
+            '[[feeds]]\nname = "a"\nurl = "https://a.com"\nkind = "rss"\n\n'
+            '[[feeds]]\nname = "a-dup"\nurl = "https://a.com/"\nkind = "rss"\n'
+        )
+        feeds_file.write_text(content, encoding="utf-8")
+
+        registry = FeedRegistry(feeds_file)
+        feeds = registry.load()
+        assert len(feeds) == 1
+        assert feeds[0].name == "a"
+
+        # Verify file was cleaned
+        text = feeds_file.read_text(encoding="utf-8")
+        assert 'name = "a-dup"' not in text
+
+    def test_add_returns_added_for_new(self, tmp_path):
+        feeds_file = tmp_path / "feeds.toml"
+        registry = FeedRegistry(feeds_file)
+        status = registry.add(Feed(name="new", url="https://new.com", kind="rss"))
+        assert status == "added"
+
+    def test_add_returns_updated_when_metadata_changes(self, tmp_path):
+        feeds_file = tmp_path / "feeds.toml"
+        registry = FeedRegistry(feeds_file)
+        registry.add(Feed(name="old-name", url="https://x.com", kind="rss"))
+        
+        status = registry.add(Feed(name="new-name", url="https://x.com", kind="rss"))
+        assert status == "updated"
+        
+        feeds = registry.load()
+        assert feeds[0].name == "new-name"
+
+    def test_add_returns_unchanged_when_same(self, tmp_path):
+        feeds_file = tmp_path / "feeds.toml"
+        registry = FeedRegistry(feeds_file)
+        registry.add(Feed(name="same", url="https://x.com", kind="rss"))
+        
+        status = registry.add(Feed(name="same", url="https://x.com", kind="rss"))
+        assert status == "unchanged"
+
+    def test_remove_by_url(self, tmp_path):
+        feeds_file = tmp_path / "feeds.toml"
+        _write_feeds_toml(feeds_file, [
+            {"name": "a", "url": "https://a.com", "kind": "rss"},
+            {"name": "b", "url": "https://b.com", "kind": "rss"},
+        ])
+
+        registry = FeedRegistry(feeds_file)
+        registry.load()
+        registry.remove_by_url("https://a.com/")
+        
+        feeds = registry.load()
+        assert len(feeds) == 1
+        assert feeds[0].name == "b"
+
+    def test_remove_by_url_missing_raises_keyerror(self, tmp_path):
+        feeds_file = tmp_path / "feeds.toml"
+        registry = FeedRegistry(feeds_file)
+        registry.load()
+        with pytest.raises(KeyError, match="not found"):
+            registry.remove_by_url("https://nonexistent.com")
+
 class TestAdd:
     def test_add_creates_entry(self, tmp_path):
         feeds_file = tmp_path / "feeds.toml"

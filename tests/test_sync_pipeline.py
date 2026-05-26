@@ -114,6 +114,29 @@ class TestPipelineRunsCleanly:
         assert isinstance(result.duration_seconds, float)
 
 
+    @pytest.mark.asyncio
+    async def test_browser_cleanup_called(self, config, wiki_dir, tmp_path):
+        """Browser cleanup is called at the end of a pipeline run."""
+        pipeline = _make_pipeline(config, wiki_dir)
+
+        with (
+            patch("readpile.sync.logging.setup_logging"),
+            patch(
+                "readpile.sync.sources.FeedRegistry.load",
+                return_value=[],
+            ),
+            patch(
+                "readpile.core.config.get_config_path",
+                return_value=tmp_path / "config.toml",
+            ),
+            patch(
+                "readpile.scrapers.cleanup_browser", new_callable=AsyncMock,
+            ) as mock_cleanup,
+        ):
+            await pipeline.run()
+
+        mock_cleanup.assert_called_once()
+
 class TestSkipFlags:
     """--no-email, --no-feeds, --no-digest skip their respective stages."""
 

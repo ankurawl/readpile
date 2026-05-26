@@ -14,6 +14,7 @@ import asyncio
 import re
 
 from readpile.core.models import ContentItem, ContentType
+from readpile.core.detector import is_error_content, ScrapeError
 
 
 # ---------------------------------------------------------------------------
@@ -143,6 +144,9 @@ async def scrape_webpage(url: str, page: "Page | None" = None) -> ContentItem:
     # Extract the main text via the selector cascade.
     text_content: str = await page.evaluate(_CONTENT_EXTRACTION_JS)
     text_content = text_content.strip()
+
+    if is_error_content(text_content):
+        raise ScrapeError(f"Scraped content from {url} appears to be an error or block page.")
 
     # Retrieve and clean the page title.
     raw_title = await page.title()

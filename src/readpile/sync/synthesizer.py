@@ -30,6 +30,7 @@ class Synthesizer:
         self._wait_days = sync_cfg.get("synthesis_wait_days", 7)
         self._window_days = sync_cfg.get("synthesis_window_days", 90)
         self._max_per_run = sync_cfg.get("max_auto_synthesize_per_run", 20)
+        self._delay = sync_cfg.get("synthesis_delay_seconds", 0)
 
     async def process_pending(self, verbose: bool = False) -> None:
         from readpile.sync.logging import setup_logging
@@ -75,6 +76,8 @@ class Synthesizer:
                     log.info("Synthesizing item %d/%d: %s", i, len(to_synthesize), path)
                 if not self.dry_run:
                     await self._synthesize_source(path, state)
+                    if self._delay > 0 and i < len(to_synthesize):
+                        await asyncio.sleep(self._delay)
                 else:
                     log.info("  [dry-run] Would synthesize: %s", path)
 
@@ -112,9 +115,6 @@ class Synthesizer:
 
             to_synthesize.sort(key=lambda x: x[1])
 
-            if len(to_synthesize) > self._max_per_run:
-                to_synthesize = to_synthesize[:self._max_per_run]
-
             if verbose:
                 log.info("Processing %d items for synthesis (--all)", len(to_synthesize))
 
@@ -123,6 +123,8 @@ class Synthesizer:
                     log.info("Synthesizing item %d/%d: %s", i, len(to_synthesize), path)
                 if not self.dry_run:
                     await self._synthesize_source(path, state)
+                    if self._delay > 0 and i < len(to_synthesize):
+                        await asyncio.sleep(self._delay)
                 else:
                     log.info("  [dry-run] Would synthesize: %s", path)
 
@@ -150,8 +152,10 @@ class Synthesizer:
             state.release_lock()
 
     async def _synthesize_source(self, source_path: str, state: SyncState) -> None:
-        from readpile.wiki import WikiStore
+        from readpile.wiki import WikiStore, WikiPage
         from readpile.sync.llm import generate
+        from readpile.core.detector import is_error_content
+        import yaml
 
         store = WikiStore(self.wiki_dir)
 
@@ -160,6 +164,11 @@ class Synthesizer:
         except FileNotFoundError:
             log.warning("Source not found: %s", source_path)
             state.mark_synthesis_failed(source_path, "Source file not found")
+            return
+
+        if is_error_content(source_content):
+            log.warning("Source content appears to be an error page: %s", source_path)
+            state.mark_synthesis_failed(source_path, "Source content is an error page")
             return
 
         title_match = re.search(r'^title:\s*"?(.+?)"?\s*$', source_content, re.MULTILINE)
@@ -227,8 +236,25 @@ Analyze this source and either create/update a wiki page or skip if redundant.""
             return
 
         page_content = response.strip()
-        if page_content.startswith("```"):
-            page_content = page_content.split("\n", 1)[1].rsplit("```", 1)[0]
+
+        # 1. Handle code blocks (some LLMs wrap the whole thing)
+        if "```" in page_content:
+            # Try to find content inside a code block
+            cb_match = re.search(r"```(?:\w+)?\n(.*?)\n```", page_content, re.DOTALL)
+            if cb_match:
+                page_content = cb_match.group(1).strip()
+            else:
+                # Fallback: just strip the delimiters
+                page_content = page_content.split("```", 1)[1].rsplit("```", 1)[0].strip()
+
+        # 2. Handle conversational preamble (ensure it starts with ---)
+        if not page_content.startswith("---") and "---" in page_content:
+            page_content = page_content[page_content.find("---"):].strip()
+
+        if not page_content.startswith("---"):
+            log.error("LLM returned non-conformant response for %s (missing ---)", source_path)
+            state.mark_synthesis_failed(source_path, "Non-conformant LLM response (missing frontmatter)")
+            return
 
         page_title_match = re.search(r'^title:\s*"?(.+?)"?\s*$', page_content, re.MULTILINE)
         page_title = page_title_match.group(1) if page_title_match else source_title
@@ -243,6 +269,18 @@ Analyze this source and either create/update a wiki page or skip if redundant.""
             slug = f"{slug}-{suffix}"
 
         try:
+            # Verify parsing before writing
+            try:
+                WikiPage.from_markdown(page_content)
+            except ValueError as exc:
+                # Attempt repair once
+                repaired = self._repair_frontmatter(page_content)
+                if repaired:
+                    WikiPage.from_markdown(repaired)
+                    page_content = repaired
+                else:
+                    raise
+
             await asyncio.to_thread(store.write_page, slug, page_content)
             state.mark_synthesized(source_path)
             log.info("Created/updated page: %s", slug)
@@ -250,16 +288,10 @@ Analyze this source and either create/update a wiki page or skip if redundant.""
                 store.append_log,
                 f"synthesize | write | {page_title} | {source_path}",
             )
-        except ValueError as exc:
-            repaired = self._repair_frontmatter(page_content)
-            if repaired:
-                try:
-                    await asyncio.to_thread(store.write_page, slug, repaired)
-                    state.mark_synthesized(source_path)
-                    log.info("Created page (after repair): %s", slug)
-                    return
-                except Exception:
-                    pass
+        except (ValueError, yaml.YAMLError) as exc:
+            log.error("Synthesis failed for %s (parsing error): %s", source_path, exc)
+            state.mark_synthesis_failed(source_path, f"Parsing error: {exc}")
+        except Exception as exc:
             log.error("Synthesis failed for %s: %s", source_path, exc)
             state.mark_synthesis_failed(source_path, str(exc))
 

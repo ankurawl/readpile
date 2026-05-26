@@ -32,16 +32,8 @@ def test_config_path_env(monkeypatch):
     assert str(get_config_path()) == "/tmp/custom.toml"
 
 
-# --- Environment variable override ---
+# --- CLI overrides ---
 
-
-def test_env_var_override(monkeypatch):
-    monkeypatch.setenv("HF_TOKEN", "test-token-123")
-    config = load_config()
-    assert config["transcribe"]["hf_token"] == "test-token-123"
-
-
-# --- TOML file loading ---
 
 
 def test_toml_file_loading(tmp_path, monkeypatch):

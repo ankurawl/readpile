@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from bs4 import BeautifulSoup
 
 from readpile.core.models import ContentItem, ContentType
+from readpile.core.detector import is_error_content, ScrapeError
 
 
 # ── dependency guard ──────────────────────────────────────────────
@@ -65,6 +66,9 @@ def scrape_article(url: str, html: str) -> ContentItem:
 
     markdown = _html_to_markdown(article_html)
     markdown = _clean_markdown(markdown)
+
+    if is_error_content(markdown):
+        raise ScrapeError(f"Scraped content from {url} appears to be an error or block page.")
 
     return ContentItem(
         content_type=ContentType.article,

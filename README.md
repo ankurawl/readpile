@@ -39,7 +39,7 @@ readpile is the plumbing that makes this work — content extraction, feed monit
 
 ## Design Philosophy
 
-**Content extraction has no built-in LLM.** Scraping, transcription, crawling, and wiki file I/O are pure code — no API keys needed, works with any MCP client. The sync pipeline is the exception: it calls an LLM API directly for automated digest grouping and wiki synthesis, so it does require an API key.
+**Content extraction has no built-in LLM.** Scraping, transcription, crawling, and wiki file I/O are pure code — no API keys needed, works with any MCP client. The sync pipeline is the exception: it calls an LLM API directly for automated digest grouping and wiki synthesis, so it does require an API key (stored in `config.toml`).
 
 **Thin tools + conventions file.** The wiki tools handle file I/O and validation, not workflow orchestration. Behavioral rules — how to categorize, cross-reference, and synthesize — live in `wiki-conventions.md`, a markdown file the LLM reads as a prompt. Changing wiki behavior means editing markdown, not Python. Different wikis can have different conventions.
 
@@ -103,7 +103,7 @@ Before running `readpile init`, have these ready:
 readpile init
 ```
 
-This walks you through configuration interactively — including creating your wiki. The init command prints next steps when it finishes, including the exact env vars to set. You can re-run `readpile init` at any time to change your settings.
+This walks you through configuration interactively — including creating your wiki and setting your API keys. You can re-run `readpile init` at any time to change your settings.
 
 After init, add feeds. These serve double duty — they define what the sync pipeline crawls for new content **and** which email senders are trusted (see [Trusted senders](#trusted-senders)):
 
@@ -112,23 +112,6 @@ readpile feeds add "https://blog.example.com"        # auto-detects RSS feed
 readpile feeds add "https://youtube.com/@3blue1brown" # YouTube channel
 readpile feeds add "https://acquired.fm"              # podcast
 ```
-
-### Set environment variables
-
-Add these to your shell profile (`~/.zshrc` or `~/.bashrc`) so they persist across sessions:
-
-```bash
-# Required for sync pipeline (digest grouping + wiki synthesis)
-export READPILE_LLM_API_KEY='your-api-key'
-
-# Only if you enabled email — this is the Gmail App Password for
-# the READPILE inbox (e.g. readpile-inbox@gmail.com), NOT your
-# personal email. It lets readpile send digest emails from that account.
-# Paste the 16 characters with or without spaces — both formats work.
-export READPILE_SMTP_PASSWORD='your-gmail-app-password'
-```
-
-Then reload: `source ~/.zshrc`
 
 ### 4. Connect to your LLM
 
@@ -200,9 +183,9 @@ Every capability is available both as a CLI command and as an MCP tool. The CLI 
 |------------|-----|-------------|
 | Sync | `readpile sync` | Check email + feeds, save source files, send digest |
 | Synthesize | `readpile synthesize --pending` | LLM-powered wiki page creation from approved source files |
-| Add feed | `readpile feeds add URL` | Auto-detect type and add a feed |
-| List feeds | `readpile feeds list` | Show all feeds with status |
-| Remove feed | `readpile feeds remove NAME` | Remove a feed by name |
+| Add feed | `readpile feeds add URL` | Auto-detect type and add (or update) a feed |
+| List feeds | `readpile feeds list` | Show all feeds with indices and status |
+| Remove feed | `readpile feeds remove IDS` | Remove feed(s) by index (e.g. `1,3-5`) or name |
 | Enable feed | `readpile feeds enable NAME` | Re-enable a disabled feed |
 | Status | `readpile status` | Overview: last sync, pending count, feed health |
 
@@ -458,7 +441,7 @@ max_pages = 100
 [transcribe]
 engine = "auto"                   # "auto" | "whisper" | "whisperx"
 whisper_model = "base"            # "tiny" | "base" | "small" | "medium" | "large"
-diarize = false                   # speaker diarization (requires HF_TOKEN)
+diarize = false                   # speaker diarization (requires hf_token)
 
 [wiki]
 default_dir = ""                  # default wiki directory for MCP tools
@@ -466,8 +449,8 @@ default_dir = ""                  # default wiki directory for MCP tools
 [llm]
 base_url = "anthropic"            # shortcut or full URL (see below)
 model = "claude-sonnet-4-6"
-# API key via env: READPILE_LLM_API_KEY
-#
+api_key = "sk-..."
+
 # Shortcuts: "anthropic", "openai" (empty — SDK default), "gemini",
 #            "openrouter", "ollama" (localhost:11434)
 # Or any OpenAI-compatible URL: "https://my-proxy.example.com/v1"
@@ -497,7 +480,7 @@ account = "readpile-inbox@gmail.com"
 enabled = true
 to = "personal@email.com"
 from = "readpile-inbox@gmail.com"
-# SMTP password via env: READPILE_SMTP_PASSWORD
+smtp_password = "..."             # Gmail App Password for the inbox account
 # This is the App Password for the READPILE email account (the "from" address),
 # NOT your personal email. It lets readpile send digests from that inbox.
 # Requires 2FA enabled on the account, then generate at:
@@ -526,15 +509,17 @@ kind = "rss"
 synthesize = false    # save source files but skip wiki synthesis
 ```
 
-### Environment variables
+### Configuration and Environment Variables
 
-| Variable | Purpose |
-|----------|---------|
-| `READPILE_LLM_API_KEY` | API key for your LLM provider (used by sync pipeline). Not needed for local models |
-| `READPILE_SMTP_PASSWORD` | Gmail App Password for the **readpile inbox** (the `from` address in digest config) — lets readpile send digest emails from that account |
-| `HF_TOKEN` | HuggingFace token for speaker diarization |
-| `READPILE_CONFIG` | Override config file path |
-| `YOUTUBE_COOKIES` | Path to YouTube cookie file (see below) |
+Configuration is managed in `~/.readpile/config.toml`. `readpile init` creates this file for you and interactively prompts for required secrets.
+
+| Variable/Key | Location | Purpose |
+|--------------|----------|---------|
+| `api_key` | `[llm]` in `config.toml` | API key for your LLM provider (used by sync pipeline). Not needed for local models |
+| `smtp_password` | `[sync.digest]` in `config.toml` | Gmail App Password for the **readpile inbox** — lets readpile send digest emails |
+| `hf_token` | `[transcribe]` in `config.toml` | HuggingFace token for optional speaker diarization |
+| `READPILE_CONFIG` | Environment variable | Override the default `~/.readpile/config.toml` path |
+| `YOUTUBE_COOKIES` | Environment or `config.toml` | Path to YouTube cookie file (see below) |
 
 ### Gmail OAuth setup
 
@@ -619,14 +604,14 @@ All secrets stay outside the codebase and outside git:
 
 | Data | Storage | Protection |
 |------|---------|------------|
-| LLM API key | `READPILE_LLM_API_KEY` env var | Never written to any file |
-| SMTP password | `READPILE_SMTP_PASSWORD` env var | Never written to any file |
+| LLM API key | `~/.readpile/config.toml` | chmod 600, not in repo |
+| SMTP password | `~/.readpile/config.toml` | chmod 600, not in repo |
+| HuggingFace token | `~/.readpile/config.toml` | chmod 600, not in repo |
 | OAuth client credentials | `~/.readpile/email-credentials.json` | chmod 600, not in repo |
 | OAuth token | `~/.readpile/email-token.json` | chmod 600, auto-refreshed |
-| Config file | `~/.readpile/config.toml` | Contains no secrets |
 | Wiki content | `~/my-wiki/` | No secrets — safe for git or Obsidian |
 
-`readpile init` creates `~/.readpile/` with chmod 700 and sets chmod 600 on credential files automatically.
+`readpile init` creates `~/.readpile/` with chmod 700 and sets chmod 600 on the configuration and credential files automatically.
 
 The sync pipeline is designed for a single machine. The state file (`~/.readpile/sync-state.json`) is machine-local. If you sync your wiki via git or cloud storage, only run `readpile sync` on one machine to avoid duplicate processing.
 

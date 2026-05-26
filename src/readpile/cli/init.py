@@ -20,7 +20,8 @@ filename_max_length = 80
 engine = "auto"
 whisper_model = "{whisper_model}"
 diarize = false
-# HuggingFace token via env: HF_TOKEN
+# HuggingFace token for optional speaker diarization:
+hf_token = "{hf_token}"
 # YouTube cookies for bypassing IP bans (see README for setup):
 # youtube_cookies = "~/.readpile/youtube-cookies.txt"
 
@@ -42,7 +43,7 @@ _LLM_TEMPLATE = """\
 [llm]
 base_url = "{llm_base_url}"
 model = "{llm_model}"
-# API key via env: READPILE_LLM_API_KEY
+api_key = "{llm_api_key}"
 """
 
 _SYNC_TEMPLATE = """\
@@ -70,10 +71,10 @@ to = "{digest_to}"
 from = "{digest_from}"
 smtp_host = "smtp.gmail.com"
 smtp_port = 587
+smtp_password = "{smtp_password}"
 max_topic_files = 5
 max_pending_digests = 7
 wiki_health_day = "saturday"
-# SMTP password via env: READPILE_SMTP_PASSWORD
 """
 
 _LLM_PRESETS: dict[str, tuple[str, str]] = {
@@ -112,6 +113,12 @@ def init() -> None:
         default="medium",
     )
 
+    typer.echo("  (Optional) HuggingFace token for speaker diarization (speaker ID).")
+    typer.echo("  Required only for whisperx with 'diarize = true'.")
+    hf_token = typer.prompt(
+        "HuggingFace token", default="", show_default=False
+    )
+
     typer.echo("")
     typer.echo("─── Wiki ───")
     typer.echo("")
@@ -141,6 +148,10 @@ def init() -> None:
         default=default_model or "claude-sonnet-4-6",
     )
 
+    llm_api_key = ""
+    if llm_base_url != "ollama" and not llm_base_url.startswith("http://localhost"):
+        llm_api_key = typer.prompt("LLM API Key")
+
     typer.echo("")
     typer.echo("─── Email & Digest ───")
     typer.echo("  Optional. Enables automated content collection from a dedicated email")
@@ -155,6 +166,7 @@ def init() -> None:
     email_account = ""
     digest_to = ""
     digest_from = ""
+    smtp_password = ""
 
     if email_enabled:
         email_account = typer.prompt(
@@ -165,6 +177,9 @@ def init() -> None:
             "Your personal email (where readpile sends daily digests)"
         )
         digest_from = email_account
+        typer.echo("  To send digests, readpile needs a Gmail App Password for the inbox.")
+        typer.echo("  Generate one at: Google Account -> Security -> App Passwords")
+        smtp_password = typer.prompt("Gmail App Password")
 
     # --- Build config ---
 
@@ -177,10 +192,15 @@ def init() -> None:
 
     content = _CONFIG_TEMPLATE.format(
         whisper_model=whisper_model,
+        hf_token=hf_token,
         wiki_dir=wiki_dir,
     )
 
-    content += _LLM_TEMPLATE.format(llm_base_url=llm_base_url, llm_model=llm_model)
+    content += _LLM_TEMPLATE.format(
+        llm_base_url=llm_base_url,
+        llm_model=llm_model,
+        llm_api_key=llm_api_key,
+    )
 
     content += _SYNC_TEMPLATE.format(
         email_enabled=str(email_enabled).lower(),
@@ -189,9 +209,14 @@ def init() -> None:
         digest_enabled=str(email_enabled).lower(),
         digest_to=digest_to,
         digest_from=digest_from,
+        smtp_password=smtp_password,
     )
 
     config_path.write_text(content, encoding="utf-8")
+    try:
+        os.chmod(config_path, stat.S_IRUSR | stat.S_IWUSR)  # 600
+    except OSError:
+        pass
 
     feeds_path = config_dir / "feeds.toml"
     if not feeds_path.exists():
@@ -212,45 +237,26 @@ def init() -> None:
     # --- Next steps ---
 
     typer.echo("")
-    typer.echo(f"Config written to {config_path}")
+    typer.echo(f"Config written to {config_path} (permissions: 600)")
     typer.echo("")
     typer.echo("─── Next Steps ───")
     typer.echo("")
 
-    env_vars: list[str] = []
     step = 1
 
-    if llm_base_url != "ollama" and not llm_base_url.startswith("http://localhost"):
-        env_vars.append(f"  export READPILE_LLM_API_KEY='your-api-key'")
-        typer.echo(f"{step}. Set your LLM API key (for sync pipeline):")
-        typer.echo(f"     export READPILE_LLM_API_KEY='your-api-key'")
-        typer.echo("")
-        step += 1
-
     if email_enabled:
-        env_vars.append(f"  export READPILE_SMTP_PASSWORD='your-gmail-app-password'")
-        typer.echo(
-            f"{step}. Set up email sending (for digests from {email_account}):"
-        )
-        typer.echo(f"     a. Enable 2FA on the {email_account} Google account")
-        typer.echo(f"     b. Generate an App Password: Google Account → Security → App Passwords")
-        typer.echo(f"     c. Set the env var (paste the 16 characters with or without spaces):")
-        typer.echo(f"          export READPILE_SMTP_PASSWORD='abcdefghijklmnop'")
-        typer.echo("")
-        step += 1
         typer.echo(
             f"{step}. Set up email reading (for inbox collection from {email_account}):"
         )
         typer.echo(f"     See the 'Gmail OAuth setup' section in README.md for a step-by-step guide.")
         typer.echo("")
+        step += 1
 
-    if env_vars:
-        typer.echo("  Add to your shell profile (~/.zshrc or ~/.bashrc) to persist:")
-        for var in env_vars:
-            typer.echo(f"  {var}")
-        typer.echo("")
+    typer.echo(f"{step}. Add your first feeds:")
+    typer.echo("     readpile feeds add 'https://example.com/blog'")
+    typer.echo("")
 
-    typer.echo("You can re-run `readpile init` at any time to regenerate this config.")
+    typer.echo("You can re-run `readpile init` at any time to update your configuration.")
 
 
 if __name__ == "__main__":

@@ -193,9 +193,10 @@ class DigestSender:
     def send(
         self, subject: str, body: str, attachments: list[Path], to: str,
     ) -> None:
-        password = os.environ.get("READPILE_SMTP_PASSWORD", "")
+        digest_cfg = self.config.get("sync", {}).get("digest", {})
+        password = digest_cfg.get("smtp_password", "")
         if not password:
-            log.warning("READPILE_SMTP_PASSWORD not set, saving digest to pending")
+            log.warning("smtp_password not set in config, saving digest to pending")
             self._save_pending(subject, body, attachments)
             return
 

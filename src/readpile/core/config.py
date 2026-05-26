@@ -71,11 +71,7 @@ DEFAULTS: dict = {
 # Environment variable -> config path mapping
 # ---------------------------------------------------------------------------
 
-ENV_MAP: dict[str, tuple[str, ...]] = {
-    "HF_TOKEN": ("transcribe", "hf_token"),
-    "READPILE_LLM_API_KEY": ("llm", "api_key"),
-    "READPILE_SMTP_PASSWORD": ("sync", "digest", "smtp_password"),
-}
+ENV_MAP: dict[str, tuple[str, ...]] = {}
 
 # ---------------------------------------------------------------------------
 # Internal helpers

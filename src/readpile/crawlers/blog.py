@@ -400,6 +400,9 @@ class BlogCrawler:
             return None
         self.visited.add(url)
 
+        if self.delay > 0 and len(self.visited) > 1:
+            await asyncio.sleep(self.delay)
+
         try:
             response = await page.goto(
                 url, wait_until="domcontentloaded", timeout=30000

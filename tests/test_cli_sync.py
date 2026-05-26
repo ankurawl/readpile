@@ -101,12 +101,74 @@ class TestFeedsList:
             result = runner.invoke(app, ["feeds", "list"])
 
         assert result.exit_code == 0
-        assert "My Blog" in result.output
+        assert "1. My Blog" in result.output
+        assert "2. ML Podcast" in result.output
+        assert "3. Old Feed" in result.output
         assert "rss" in result.output
         assert "ML Podcast" in result.output
         assert "[no-synth]" in result.output
         assert "Old Feed" in result.output
         assert "[disabled]" in result.output
+
+
+# ---------------------------------------------------------------------------
+# feeds remove
+# ---------------------------------------------------------------------------
+
+
+class TestFeedsRemove:
+    """readpile feeds remove with indices, ranges, and names."""
+
+    def test_feeds_remove_by_index(self, tmp_path):
+        from readpile.sync.sources import Feed
+
+        feeds = [
+            Feed(name="Feed 1", url="https://1.com", kind="rss"),
+            Feed(name="Feed 2", url="https://2.com", kind="rss"),
+        ]
+
+        with patch("readpile.core.config.get_config_path", return_value=tmp_path / "config.toml"), \
+             patch("readpile.sync.sources.FeedRegistry.load", return_value=feeds), \
+             patch("readpile.sync.sources.FeedRegistry.remove_by_url") as mock_remove:
+            
+            result = runner.invoke(app, ["feeds", "remove", "1"])
+            assert result.exit_code == 0
+            mock_remove.assert_called_once_with("https://1.com")
+            assert "Removed: Feed 1" in result.output
+
+    def test_feeds_remove_by_range(self, tmp_path):
+        from readpile.sync.sources import Feed
+
+        feeds = [
+            Feed(name="F1", url="https://1.com", kind="rss"),
+            Feed(name="F2", url="https://2.com", kind="rss"),
+            Feed(name="F3", url="https://3.com", kind="rss"),
+        ]
+
+        with patch("readpile.core.config.get_config_path", return_value=tmp_path / "config.toml"), \
+             patch("readpile.sync.sources.FeedRegistry.load", return_value=feeds), \
+             patch("readpile.sync.sources.FeedRegistry.remove_by_url") as mock_remove:
+            
+            result = runner.invoke(app, ["feeds", "remove", "1, 3"])
+            assert result.exit_code == 0
+            assert mock_remove.call_count == 2
+            mock_remove.assert_any_call("https://1.com")
+            mock_remove.assert_any_call("https://3.com")
+
+    def test_feeds_remove_by_name_fallback(self, tmp_path):
+        from readpile.sync.sources import Feed
+
+        feeds = [
+            Feed(name="Special Name", url="https://special.com", kind="rss"),
+        ]
+
+        with patch("readpile.core.config.get_config_path", return_value=tmp_path / "config.toml"), \
+             patch("readpile.sync.sources.FeedRegistry.load", return_value=feeds), \
+             patch("readpile.sync.sources.FeedRegistry.remove_by_url") as mock_remove:
+            
+            result = runner.invoke(app, ["feeds", "remove", "Special Name"])
+            assert result.exit_code == 0
+            mock_remove.assert_called_once_with("https://special.com")
 
 
 # ---------------------------------------------------------------------------

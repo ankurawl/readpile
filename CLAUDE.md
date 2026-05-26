@@ -106,9 +106,9 @@ readpile wiki search QUERY # Search wiki pages
 readpile wiki log          # View wiki log
 readpile sync              # Check email + subscriptions, send digest
 readpile synthesize        # Synthesize source files into wiki pages
-readpile feeds add URL   # Add a feed subscription
-readpile feeds list      # List feed subscriptions
-readpile feeds remove N  # Remove a feed subscription
+readpile feeds add URL   # Add a feed subscription (updates existing if URL matches)
+readpile feeds list      # List feed subscriptions with serial numbers
+readpile feeds remove ID   # Remove feed(s) by index (1, 3-5) or name
 readpile status            # Show sync overview
 ```
 
@@ -250,9 +250,7 @@ The sync module (`src/readpile/sync/`) contains:
 [llm]
 base_url = "anthropic"
 model = "claude-sonnet-4-6"
-# API key via env: READPILE_LLM_API_KEY
-# Shortcuts: anthropic, openai, gemini, openrouter, ollama
-# Or any OpenAI-compatible URL
+api_key = "..."
 
 [sync]
 synthesis_wait_days = 7
@@ -266,11 +264,12 @@ account = "readpile-inbox@gmail.com"
 [sync.digest]
 enabled = true
 to = "personal@email.com"
-# SMTP password via env: READPILE_SMTP_PASSWORD
+smtp_password = "..."
 ```
 
 Feed subscriptions are stored separately in `~/.readpile/feeds.toml` (machine-managed via `readpile feeds` commands).
 
 ### Security
 
-All secrets via env vars only (`READPILE_LLM_API_KEY`, `READPILE_SMTP_PASSWORD`). OAuth credentials stored in `~/.readpile/` with chmod 600. No secrets in config files.
+- All secrets stored in `~/.readpile/config.toml` (chmod 600). OAuth credentials in `~/.readpile/` (chmod 600).
+

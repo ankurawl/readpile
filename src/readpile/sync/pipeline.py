@@ -81,6 +81,8 @@ class SyncPipeline:
             return await self._run_pipeline(state, no_email, no_feeds, no_digest, verbose)
         finally:
             state.release_lock()
+            from readpile.scrapers import cleanup_browser
+            await cleanup_browser()
 
     async def _run_pipeline(
         self,
@@ -234,8 +236,11 @@ class SyncPipeline:
                     url=action.url,
                     kind=action.kind,
                 )
-                registry.add(feed)
-                log.info("Added feed: %s", action.url)
+                status = registry.add(feed)
+                if status == "added":
+                    log.info("Added feed: %s", action.url)
+                elif status == "updated":
+                    log.info("Updated existing feed: %s", action.url)
             elif isinstance(action, RemoveFeedAction):
                 try:
                     registry.remove(action.name)

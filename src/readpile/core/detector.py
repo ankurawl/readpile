@@ -169,3 +169,45 @@ def extract_youtube_video_id(url: str) -> str | None:
         return match.group(1)
 
     return None
+
+# ---------------------------------------------------------------------------
+# Error Content Detection
+# ---------------------------------------------------------------------------
+
+# Common strings found in block pages (Cloudflare, 429s, etc.)
+_BLOCK_PATTERNS = [
+    r"too many requests",
+    r"429 \b",
+    r"access denied",
+    r"403 forbidden",
+    r"checking your browser before accessing",
+    r"cloudflare",
+    r"verify you are a human",
+    r"ddos protection",
+    r"unusual traffic from your computer network",
+    r"automated access is prohibited",
+]
+
+_COMPILED_BLOCK_PATTERNS = [re.compile(p, re.I) for p in _BLOCK_PATTERNS]
+
+
+def is_error_content(text: str) -> bool:
+    """Return True if the text appears to be an error or block page."""
+    if not text:
+        return True
+    
+    # If the text is very short, it might be an error
+    if len(text.strip()) < 100:
+        lowered = text.lower()
+        if "forbidden" in lowered or "unauthorized" in lowered or "not found" in lowered:
+            return True
+
+    for pattern in _COMPILED_BLOCK_PATTERNS:
+        if pattern.search(text):
+            return True
+            
+    return False
+
+class ScrapeError(Exception):
+    """Raised when scraping fails or returns invalid content."""
+    pass

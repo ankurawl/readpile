@@ -207,14 +207,14 @@ class TestDigestHistory:
 class TestDigestSenderSmtp:
     """DigestSender.send() should send email via SMTP when password is set."""
 
-    @patch.dict("os.environ", {"READPILE_SMTP_PASSWORD": "secret123"})
+    @patch("readpile.sync.digest.DigestSender._send_pending")
     @patch("readpile.sync.digest.smtplib.SMTP")
-    def test_email_sent_via_smtp(self, mock_smtp_cls, tmp_path):
+    def test_email_sent_via_smtp(self, mock_smtp_cls, mock_send_pending, tmp_path):
         mock_server = MagicMock()
         mock_smtp_cls.return_value.__enter__ = MagicMock(return_value=mock_server)
         mock_smtp_cls.return_value.__exit__ = MagicMock(return_value=False)
 
-        sender = DigestSender(_config())
+        sender = DigestSender(_config(smtp_password="secret123"))
         att_file = tmp_path / "digest.md"
         att_file.write_text("# Digest content")
 
@@ -229,15 +229,16 @@ class TestDigestSenderSmtp:
         mock_server.starttls.assert_called_once()
         mock_server.login.assert_called_once_with("digest@test.local", "secret123")
         mock_server.send_message.assert_called_once()
+        mock_send_pending.assert_called_once()
 
-    @patch.dict("os.environ", {"READPILE_SMTP_PASSWORD": "secret123"})
+    @patch("readpile.sync.digest.DigestSender._send_pending")
     @patch("readpile.sync.digest.smtplib.SMTP")
-    def test_attachments_included(self, mock_smtp_cls, tmp_path):
+    def test_attachments_included(self, mock_smtp_cls, mock_send_pending, tmp_path):
         mock_server = MagicMock()
         mock_smtp_cls.return_value.__enter__ = MagicMock(return_value=mock_server)
         mock_smtp_cls.return_value.__exit__ = MagicMock(return_value=False)
 
-        sender = DigestSender(_config())
+        sender = DigestSender(_config(smtp_password="secret123"))
         files = []
         for name in ["topic-a.md", "topic-b.md"]:
             f = tmp_path / name
@@ -255,18 +256,24 @@ class TestDigestSenderSmtp:
 class TestDigestSenderSmtpFailure:
     """SMTP failure should save the digest to the pending directory."""
 
-    @patch.dict("os.environ", {"READPILE_SMTP_PASSWORD": "secret123"})
+    @patch("readpile.sync.digest.DigestSender._send_pending")
     @patch("readpile.sync.digest.smtplib.SMTP")
-    def test_smtp_failure_saves_pending(self, mock_smtp_cls, tmp_path, monkeypatch):
+    def test_smtp_failure_saves_pending(
+        self, mock_smtp_cls, mock_send_pending, tmp_path, monkeypatch
+    ):
         mock_server = MagicMock()
         mock_server.send_message.side_effect = ConnectionError("SMTP down")
         mock_smtp_cls.return_value.__enter__ = MagicMock(return_value=mock_server)
         mock_smtp_cls.return_value.__exit__ = MagicMock(return_value=False)
 
         pending_dir = tmp_path / "pending-digest"
-        monkeypatch.setattr(Path, "expanduser", lambda self: tmp_path / self.name if "pending" in str(self) else self)
+        monkeypatch.setattr(
+            Path,
+            "expanduser",
+            lambda self: tmp_path / self.name if "pending" in str(self) else self,
+        )
 
-        sender = DigestSender(_config())
+        sender = DigestSender(_config(smtp_password="secret123"))
 
         att = tmp_path / "digest.md"
         att.write_text("# Content")
@@ -276,12 +283,14 @@ class TestDigestSenderSmtpFailure:
 
         def patched_save(subject, body, attachments):
             from datetime import date
+
             today_dir = pending_dir / date.today().isoformat()
             today_dir.mkdir(parents=True, exist_ok=True)
             (today_dir / "subject.txt").write_text(subject, encoding="utf-8")
             (today_dir / "body.md").write_text(body, encoding="utf-8")
             for a in attachments:
                 import shutil
+
                 shutil.copy2(a, today_dir / a.name)
 
         sender._save_pending = patched_save
@@ -293,16 +302,13 @@ class TestDigestSenderSmtpFailure:
         assert (day_dirs[0] / "subject.txt").read_text() == "Test Subject"
         assert (day_dirs[0] / "body.md").read_text() == "Test Body"
         assert (day_dirs[0] / "digest.md").exists()
+        mock_send_pending.assert_not_called()  # Should not be called on failure
 
 
 class TestDigestSenderNoPassword:
     """Missing SMTP password should save to pending, not crash."""
 
-    @patch.dict("os.environ", {}, clear=True)
     def test_no_password_saves_pending(self, tmp_path, monkeypatch):
-        # Remove the env var if present
-        monkeypatch.delenv("READPILE_SMTP_PASSWORD", raising=False)
-
         sender = DigestSender(_config())
         save_called = {"called": False}
 

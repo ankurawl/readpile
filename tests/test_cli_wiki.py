@@ -5,6 +5,7 @@ import tempfile
 from typer.testing import CliRunner
 
 from readpile.cli.wiki import app
+from readpile.core.config import DEFAULTS
 
 runner = CliRunner()
 
@@ -143,10 +144,17 @@ class TestWikiLog:
 
 
 class TestErrorCases:
-    def test_missing_wiki_no_config(self):
+    def test_missing_wiki_no_config(self, monkeypatch, tmp_path):
+        # Force a non-existent config so it uses defaults
+        monkeypatch.setenv("READPILE_CONFIG", str(tmp_path / "no-config.toml"))
+        # Ensure the default wiki dir doesn't exist
+        monkeypatch.setitem(
+            DEFAULTS["wiki"], "default_dir", str(tmp_path / "nonexistent-default")
+        )
         result = runner.invoke(app, ["list"])
         assert result.exit_code != 0 or "Error" in result.output
 
-    def test_invalid_path(self, tmp_path):
+    def test_invalid_path(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("READPILE_CONFIG", str(tmp_path / "no-config.toml"))
         result = runner.invoke(app, ["list", "--wiki", str(tmp_path / "nonexistent")])
         assert result.exit_code != 0 or "Error" in result.output

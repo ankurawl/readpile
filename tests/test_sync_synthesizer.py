@@ -455,3 +455,48 @@ class TestDryRunMode:
         mock_gen.assert_not_called()
         pages = list((wiki_dir / "pages").glob("*.md"))
         assert len(pages) == 0
+
+# ---------------------------------------------------------------------------
+# Robustness v2 fixes
+# ---------------------------------------------------------------------------
+
+class TestSynthesizerRobustnessV2:
+    @pytest.mark.asyncio
+    async def test_detects_error_page_before_llm(self, config, wiki_dir, state_dir):
+        from readpile.sync.synthesizer import Synthesizer
+        from readpile.sync.state import SyncState
+        
+        _write_state(state_dir, {"sources/error.md": _iso(_now() - timedelta(days=10))})
+        # Save a "Too Many Requests" page
+        (wiki_dir / "sources" / "error.md").write_text("Too Many Requests. Please wait.")
+        
+        with patch("readpile.sync.llm.generate") as mock_gen:
+            synth = Synthesizer(config, wiki_dir)
+            state = SyncState(state_dir / "sync-state.json", wiki_dir=wiki_dir)
+            await synth._synthesize_source("sources/error.md", state)
+            
+            # Should NOT have called LLM
+            mock_gen.assert_not_called()
+            # Should still be in pending (technically mark_synthesis_failed removes from pending in state.py, 
+            # but it is visible in 'failed' bucket)
+            assert "sources/error.md" in state.get_failed()
+            assert state.get_failed()["sources/error.md"]["error"] == "Source content is an error page"
+
+    @pytest.mark.asyncio
+    async def test_graceful_parsing_failure(self, config, wiki_dir, state_dir):
+        from readpile.sync.synthesizer import Synthesizer
+        from readpile.sync.state import SyncState
+        
+        _write_state(state_dir, {"sources/bad_llm.md": _iso(_now() - timedelta(days=10))})
+        (wiki_dir / "sources" / "bad_llm.md").write_text("---\ntitle: Valid\n---\nContent")
+        
+        # LLM returns something without delimiters
+        bad_response = "I cannot process this file as it is empty."
+        
+        with patch("readpile.sync.llm.generate", return_value=bad_response):
+            synth = Synthesizer(config, wiki_dir)
+            state = SyncState(state_dir / "sync-state.json", wiki_dir=wiki_dir)
+            await synth._synthesize_source("sources/bad_llm.md", state)
+            
+            assert "sources/bad_llm.md" in state.get_failed()
+            assert "Non-conformant" in state.get_failed()["sources/bad_llm.md"]["error"]

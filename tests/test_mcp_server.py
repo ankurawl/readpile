@@ -246,8 +246,9 @@ class TestDiscoverPodcastFeed:
 
 
 class TestTranscribeFallback:
+    @patch("readpile.transcribers.audio._check_ffmpeg", side_effect=SystemExit(1))
     @patch("readpile.mcp_server._extract_media_url")
-    def test_audio_with_fallback_url(self, mock_extract):
+    def test_audio_with_fallback_url(self, mock_extract, mock_check_ffmpeg):
         """When audio transcription fails (no ffmpeg) and fallback_url has
         a YouTube embed, transcribe via YouTube captions instead."""
         import asyncio
@@ -283,8 +284,9 @@ class TestTranscribeFallback:
 
         asyncio.run(_run())
 
+    @patch("readpile.transcribers.audio._check_ffmpeg", side_effect=SystemExit(1))
     @patch("readpile.mcp_server._extract_media_url")
-    def test_audio_with_fallback_no_embed(self, mock_extract):
+    def test_audio_with_fallback_no_embed(self, mock_extract, mock_check_ffmpeg):
         """When fallback_url has no YouTube embed, return error message."""
         import asyncio
 
@@ -306,7 +308,8 @@ class TestTranscribeFallback:
 
         asyncio.run(_run())
 
-    def test_audio_without_fallback_url(self):
+    @patch("readpile.transcribers.audio._check_ffmpeg", side_effect=SystemExit(1))
+    def test_audio_without_fallback_url(self, mock_check_ffmpeg):
         """When audio transcription fails and no fallback_url, return error."""
         import asyncio
 

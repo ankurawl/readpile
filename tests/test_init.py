@@ -8,7 +8,7 @@ import pytest
 from readpile.cli.init import _CONFIG_TEMPLATE
 
 
-_FMT_KWARGS = dict(whisper_model="medium", wiki_dir="~/my-wiki")
+_FMT_KWARGS = dict(whisper_model="medium", wiki_dir="~/my-wiki", hf_token="")
 
 
 class TestConfigTemplate:
@@ -38,5 +38,5 @@ class TestConfigTemplate:
         assert "[wiki]" in rendered
 
     def test_whisper_model_in_template(self):
-        rendered = _CONFIG_TEMPLATE.format(whisper_model="large", wiki_dir="~/my-wiki")
+        rendered = _CONFIG_TEMPLATE.format(whisper_model="large", wiki_dir="~/my-wiki", hf_token="")
         assert 'whisper_model = "large"' in rendered
