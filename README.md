@@ -185,10 +185,12 @@ Every capability is available both as a CLI command and as an MCP tool. The CLI 
 |------------|-----|-------------|
 | Sync | `readpile sync` | Check email + feeds, save source files, send digest |
 | Synthesize | `readpile synthesize --pending` | LLM-powered wiki page creation from approved source files |
-| Add feed | `readpile feeds add URL` | Auto-detect type and add (or update) a feed |
-| List feeds | `readpile feeds list` | Show all feeds with indices and status |
-| Remove feed | `readpile feeds remove IDS` | Remove feed(s) by index (e.g. `1,3-5`) or name |
-| Enable feed | `readpile feeds enable NAME` | Re-enable a disabled feed |
+| Add feed | `readpile feeds add URL` | Subscribe to a website, YouTube channel, or podcast for **automatic web crawling** |
+| List feeds | `readpile feeds list` | Show all feed subscriptions |
+| Remove feed | `readpile feeds remove IDS` | Unsubscribe from feed(s) |
+| Trust sender | `readpile senders add EMAIL` | Trust an individual email address for **email-based content** |
+| Scan senders | `readpile senders scan` | Interactively scan recent emails to trust new senders |
+| List senders | `readpile senders list` | Show all explicitly trusted email senders |
 | Status | `readpile status` | Overview: last sync, pending count, feed health |
 
 ### Cleanup & Administration
@@ -358,24 +360,45 @@ The same article arriving via both email newsletter and RSS feed is saved only o
 
 ### Trusted senders
 
-The sync pipeline only processes emails from **trusted senders** — everything else is silently skipped. This prevents spam, notifications, and other noise from entering your wiki. A sender is trusted if any of the following match:
+The sync pipeline only processes emails from **trusted senders** — everything else is silently skipped. This prevents spam, notifications, and other noise from entering your wiki. 
+
+#### Feed vs. Sender: Which should I use?
+
+- **Feeds (`readpile feeds add`)**: Use this when you want `readpile` to actively **crawl a website** for new content. As a side effect, if that website has a newsletter, the sender's domain is automatically trusted for email too.
+- **Trusted Senders (`readpile senders add`)**: Use this when you only want to receive content **via email**. This trusts the specific email address without performing any web crawls.
+
+A sender is trusted if any of the following match:
 
 | Rule | Example |
 |------|---------|
 | Sender's domain matches a configured feed | You added `https://blog.example.com` → emails from `newsletter@example.com` are trusted |
-| Sender is from a known newsletter platform | Substack, Beehiiv, ConvertKit, Buttondown, Mailchimp, Ghost, MailerLite |
-| Sender is listed in `skip_synthesis_senders` | `skip_synthesis_senders = ["friend@gmail.com"]` in `[sync.email]` config |
+| Sender is from a known newsletter platform | Substack, Beehiiv, Ghost, etc. are trusted by default |
+| Sender is explicitly trusted | `readpile senders add friend@gmail.com` |
 
 If `readpile sync` reports `0 email` but you know there are messages in the inbox, the sender probably isn't trusted. To fix it:
 
 - **For newsletters:** add the publication as a feed — `readpile feeds add "https://newsletter-site.com"`. This trusts all email from that domain.
-- **For individual senders:** add them to `skip_synthesis_senders` in `~/.readpile/config.toml`:
-  ```toml
-  [sync.email]
-  skip_synthesis_senders = ["friend@gmail.com", "coworker@company.com"]
+- **For individual senders:** use the `readpile senders` command:
+  ```bash
+  # Interactively scan recent emails for untrusted senders
+  readpile senders scan
+  
+  # Or add a specific email directly
+  readpile senders add friend@example.com
   ```
 
 Run `readpile sync -v` to see which senders are being skipped (`Unknown sender skipped: ...`).
+
+### Managing Trusted Senders
+
+The `readpile senders` command suite allows you to manage which individual email addresses are trusted to send content to your wiki.
+
+- **List trusted senders:** `readpile senders list`
+- **Add a trusted sender:** `readpile senders add newsletter@example.com`
+- **Scan for untrusted senders (Interactive):** `readpile senders scan`
+  - Scans recent emails (last 7 days default) and lets you choose which senders to trust.
+  - Options: `--days` (how far back to look), `--limit` (max senders to show).
+- **Remove a trusted sender:** `readpile senders remove newsletter@example.com`
 
 ---
 
@@ -486,7 +509,7 @@ account = "readpile-inbox@gmail.com"
 # Emails from unknown senders are silently skipped. Trust senders by either:
 # - Adding their domain as a feed (readpile feeds add URL), or
 # - Listing them here:
-# skip_synthesis_senders = ["friend@gmail.com"]
+# trusted_senders = ["friend@gmail.com"]
 
 [sync.digest]
 enabled = true

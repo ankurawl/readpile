@@ -52,7 +52,7 @@ DEFAULTS: dict = {
             "credentials_file": "~/.readpile/email-credentials.json",
             "labels": ["INBOX"],
             "max_age_days": 7,
-            "skip_synthesis_senders": [],
+            "trusted_senders": [],
         },
         "digest": {
             "enabled": False,

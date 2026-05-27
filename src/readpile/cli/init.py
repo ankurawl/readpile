@@ -63,7 +63,7 @@ account = "{email_account}"
 credentials_file = "~/.readpile/email-credentials.json"
 labels = ["INBOX"]
 max_age_days = 7
-skip_synthesis_senders = []
+trusted_senders = []
 
 [sync.digest]
 enabled = {digest_enabled}

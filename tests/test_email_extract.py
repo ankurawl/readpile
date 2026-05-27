@@ -41,12 +41,12 @@ def _feed(url: str, name: str = "Test") -> Feed:
 
 def _config(
     *,
-    skip_synthesis_senders: list[str] | None = None,
+    trusted_senders: list[str] | None = None,
     max_email_size_bytes: int | None = None,
 ) -> dict:
     email_cfg: dict = {}
-    if skip_synthesis_senders is not None:
-        email_cfg["skip_synthesis_senders"] = skip_synthesis_senders
+    if trusted_senders is not None:
+        email_cfg["trusted_senders"] = trusted_senders
     sync_cfg: dict = {"email": email_cfg}
     if max_email_size_bytes is not None:
         sync_cfg["max_email_size_bytes"] = max_email_size_bytes
@@ -265,36 +265,35 @@ class TestEmptyContent:
 
 
 # ---------------------------------------------------------------------------
-# skip_synthesis_senders
+# trusted_senders
 # ---------------------------------------------------------------------------
 
 
-class TestSkipSynthesisSenders:
-    """Senders in skip_synthesis_senders are trusted but items get skip_synthesis=True."""
+class TestTrustedSenders:
+    """Senders in trusted_senders are fully trusted and NOT skipped for synthesis."""
 
-    def test_skip_synthesis_sender_is_trusted(self):
+    def test_trusted_sender_is_processed(self):
         msg = _msg(sender="noreply@promotions.example.com", html_body="x" * 600)
         feeds = []
-        config = _config(skip_synthesis_senders=["noreply@promotions.example.com"])
-        status, items = extract_content(msg, feeds, config)
-        assert status == "processed"
-        assert items[0]["skip_synthesis"] is True
-
-    def test_non_skip_synthesis_sender(self):
-        msg = _msg(sender="writer@substack.com", html_body="x" * 600)
-        feeds = []
-        config = _config(skip_synthesis_senders=["other@example.com"])
+        config = _config(trusted_senders=["noreply@promotions.example.com"])
         status, items = extract_content(msg, feeds, config)
         assert status == "processed"
         assert items[0]["skip_synthesis"] is False
 
-    def test_skip_synthesis_case_insensitive(self):
+    def test_non_trusted_sender_is_skipped(self):
+        msg = _msg(sender="writer@other.com", html_body="x" * 600)
+        feeds = []
+        config = _config(trusted_senders=["special@example.com"])
+        status, items = extract_content(msg, feeds, config)
+        assert status == "skipped:unknown_sender"
+
+    def test_trusted_sender_case_insensitive(self):
         msg = _msg(sender="NoReply@Example.COM", html_body="x" * 600)
         feeds = []
-        config = _config(skip_synthesis_senders=["noreply@example.com"])
+        config = _config(trusted_senders=["noreply@example.com"])
         status, items = extract_content(msg, feeds, config)
         assert status == "processed"
-        assert items[0]["skip_synthesis"] is True
+        assert items[0]["skip_synthesis"] is False
 
 
 # ---------------------------------------------------------------------------

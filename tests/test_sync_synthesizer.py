@@ -500,3 +500,78 @@ class TestSynthesizerRobustnessV2:
             
             assert "sources/bad_llm.md" in state.get_failed()
             assert "Non-conformant" in state.get_failed()["sources/bad_llm.md"]["error"]
+
+
+class TestRobustParsing:
+    @pytest.mark.asyncio
+    async def test_frontmatter_only_code_block(self, config, wiki_dir, state_dir):
+        from readpile.sync.synthesizer import Synthesizer
+        from readpile.sync.state import SyncState
+
+        _write_state(state_dir, {"sources/test_fm_code.md": _iso(_now() - timedelta(days=10))})
+        (wiki_dir / "sources" / "test_fm_code.md").write_text("---\ntitle: test\n---\nContent")
+
+        llm_response = (
+            "```yaml\n"
+            "title: Robust Page\n"
+            "category: concept\n"
+            "tags: [test]\n"
+            "sources: [sources/test_fm_code.md]\n"
+            "related: []\n"
+            "source_date: 2025-01-01\n"
+            "ingested: 2025-05-01\n"
+            "updated: 2025-05-01\n"
+            "```\n\n"
+            "Body of the page content."
+        )
+
+        with (
+            patch("readpile.sync.logging.setup_logging"),
+            patch("readpile.sync.llm.generate", return_value=llm_response),
+            patch("readpile.wiki.store.WikiStore.search", return_value=[]),
+        ):
+            synth = Synthesizer(config, wiki_dir)
+            await synth.process_pending()
+
+        # The page should be correctly parsed and saved
+        page_path = wiki_dir / "pages" / "robust-page.md"
+        assert page_path.exists()
+        saved_content = page_path.read_text()
+        assert saved_content.startswith("---")
+        assert "Body of the page content." in saved_content
+
+    @pytest.mark.asyncio
+    async def test_auto_wrap_missing_delimiters(self, config, wiki_dir, state_dir):
+        from readpile.sync.synthesizer import Synthesizer
+        from readpile.sync.state import SyncState
+
+        _write_state(state_dir, {"sources/test_missing_delim.md": _iso(_now() - timedelta(days=10))})
+        (wiki_dir / "sources" / "test_missing_delim.md").write_text("---\ntitle: test\n---\nContent")
+
+        llm_response = (
+            "title: Wrapped Page\n"
+            "category: concept\n"
+            "tags: [test]\n"
+            "sources: [sources/test_missing_delim.md]\n"
+            "related: []\n"
+            "source_date: 2025-01-01\n"
+            "ingested: 2025-05-01\n"
+            "updated: 2025-05-01\n"
+            "\n"
+            "Body of the page content here."
+        )
+
+        with (
+            patch("readpile.sync.logging.setup_logging"),
+            patch("readpile.sync.llm.generate", return_value=llm_response),
+            patch("readpile.wiki.store.WikiStore.search", return_value=[]),
+        ):
+            synth = Synthesizer(config, wiki_dir)
+            await synth.process_pending()
+
+        # The page should be correctly parsed and saved
+        page_path = wiki_dir / "pages" / "wrapped-page.md"
+        assert page_path.exists()
+        saved_content = page_path.read_text()
+        assert saved_content.startswith("---")
+        assert "Body of the page content here." in saved_content

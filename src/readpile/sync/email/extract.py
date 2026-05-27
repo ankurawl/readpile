@@ -27,12 +27,12 @@ def _extract_sender_domain(sender: str) -> str:
     return ""
 
 
-def _is_trusted_sender(sender: str, feeds: list[Feed], skip_senders: list[str]) -> bool:
+def _is_trusted_sender(sender: str, feeds: list[Feed], trusted_senders: list[str]) -> bool:
     _, addr = parseaddr(sender)
     addr = addr.lower()
     domain = _extract_sender_domain(sender)
 
-    if addr in (s.lower() for s in skip_senders):
+    if addr in (s.lower() for s in trusted_senders):
         return True
 
     for s in feeds:
@@ -47,11 +47,6 @@ def _is_trusted_sender(sender: str, feeds: list[Feed], skip_senders: list[str]) 
             return True
 
     return False
-
-
-def _is_skip_synthesis_sender(sender: str, skip_senders: list[str]) -> bool:
-    _, addr = parseaddr(sender)
-    return addr.lower() in (s.lower() for s in skip_senders)
 
 
 def _extract_urls(text: str) -> list[str]:
@@ -84,18 +79,18 @@ def extract_content(
     """
     sync_cfg = config.get("sync", {})
     email_cfg = sync_cfg.get("email", {})
-    skip_senders = email_cfg.get("skip_synthesis_senders", [])
+    trusted_senders = email_cfg.get("trusted_senders", [])
     max_size = sync_cfg.get("max_email_size_bytes", 5 * 1024 * 1024)
 
     if msg.raw_size > max_size:
         log.warning("Email from %s too large (%d bytes), skipping", msg.sender, msg.raw_size)
         return "skipped:too_large", []
 
-    if not _is_trusted_sender(msg.sender, feeds, skip_senders):
+    if not _is_trusted_sender(msg.sender, feeds, trusted_senders):
         log.info("Unknown sender: %s, skipping", msg.sender)
         return "skipped:unknown_sender", []
 
-    skip_synth = _is_skip_synthesis_sender(msg.sender, skip_senders)
+    skip_synth = False
 
     html = msg.html_body or ""
     text = msg.text_body or ""

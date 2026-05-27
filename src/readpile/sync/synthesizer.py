@@ -237,19 +237,58 @@ Analyze this source and either create/update a wiki page or skip if redundant.""
 
         page_content = response.strip()
 
-        # 1. Handle code blocks (some LLMs wrap the whole thing)
+        # 1. Handle code blocks (some LLMs wrap the whole thing, or only the frontmatter)
         if "```" in page_content:
-            # Try to find content inside a code block
-            cb_match = re.search(r"```(?:\w+)?\n(.*?)\n```", page_content, re.DOTALL)
-            if cb_match:
-                page_content = cb_match.group(1).strip()
+            first_idx = page_content.find("```")
+            last_idx = page_content.rfind("```")
+            if page_content.startswith("```") and page_content.endswith("```") and first_idx != last_idx:
+                # Entire content is wrapped in a code block
+                lines = page_content.splitlines()
+                if len(lines) >= 2:
+                    page_content = "\n".join(lines[1:-1]).strip()
             else:
-                # Fallback: just strip the delimiters
-                page_content = page_content.split("```", 1)[1].rsplit("```", 1)[0].strip()
+                # Check if only the frontmatter is wrapped in a code block at the start
+                match = re.match(r"^\s*```(?:yaml|yml)?\n(.*?)\n```", page_content, re.DOTALL)
+                if match:
+                    frontmatter_part = match.group(1).strip()
+                    body_part = page_content[match.end():].strip()
+                    if not frontmatter_part.startswith("---"):
+                        frontmatter_part = f"---\n{frontmatter_part}"
+                    if not frontmatter_part.endswith("---"):
+                        frontmatter_part = f"{frontmatter_part}\n---"
+                    page_content = f"{frontmatter_part}\n\n{body_part}"
+                else:
+                    # General fallback: if there is a code block, try to use it
+                    cb_match = re.search(r"```(?:\w+)?\n(.*?)\n```", page_content, re.DOTALL)
+                    if cb_match:
+                        page_content = cb_match.group(1).strip()
 
         # 2. Handle conversational preamble (ensure it starts with ---)
         if not page_content.startswith("---") and "---" in page_content:
             page_content = page_content[page_content.find("---"):].strip()
+
+        # 3. Auto-wrap frontmatter if delimiters are missing but YAML fields exist
+        if not page_content.startswith("---"):
+            lines = page_content.splitlines()
+            yaml_lines = []
+            body_lines = []
+            in_body = False
+            for line in lines:
+                if in_body:
+                    body_lines.append(line)
+                else:
+                    trimmed = line.strip()
+                    if not trimmed:
+                        in_body = True
+                    elif ":" in line or trimmed.startswith("-") or trimmed.startswith("*"):
+                        yaml_lines.append(line)
+                    else:
+                        in_body = True
+                        body_lines.append(line)
+            
+            yaml_str = "\n".join(yaml_lines)
+            if "title:" in yaml_str and "category:" in yaml_str:
+                page_content = f"---\n{yaml_str}\n---\n\n" + "\n".join(body_lines)
 
         if not page_content.startswith("---"):
             log.error("LLM returned non-conformant response for %s (missing ---)", source_path)
